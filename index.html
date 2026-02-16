@@ -5,14 +5,19 @@
 <title>Geovisor de Avance Catastral</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- Buscador tipo Google Maps (Geocoder OSM) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <style>
 body { margin:0; font-family: Arial, sans-serif; }
 
 header {
-  background:#1e40af; /* Azul */
+  background:#1e40af;
   color:white;
   padding:14px 20px;
   font-size:20px;
@@ -20,22 +25,6 @@ header {
 }
 
 #map { height: calc(100vh - 65px); }
-
-.control-box {
-  background:white;
-  padding:12px;
-  border-radius:8px;
-  box-shadow:0 2px 6px rgba(0,0,0,0.3);
-  width:220px;
-}
-
-select, input {
-  width:100%;
-  margin-top:6px;
-  padding:6px;
-  border-radius:4px;
-  border:1px solid #ccc;
-}
 </style>
 </head>
 <body>
@@ -48,31 +37,40 @@ select, input {
 
 <script>
 
-var map = L.map('map');
+// Crear mapa
+var map = L.map('map').setView([-11.99, -77.05], 14); // Ajusta si quieres
 
-var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// Base OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-var manzanaLayer;
-var lotesLayer;
+// =============================
+// 🔎 BUSCADOR TIPO GOOGLE MAPS
+// =============================
 
-// Estilos
-function styleManzana() {
-  return { color:"#1d4ed8", weight:2, fill:false };
-}
+L.Control.geocoder({
+    defaultMarkGeocode: true,
+    placeholder: "Buscar dirección...",
+    errorMessage: "No se encontró la dirección"
+}).addTo(map);
 
-function styleLotes() {
-  return { color:"#16a34a", weight:1, fillOpacity:0.4 };
-}
 
-// Cargar Manzanas
+// =============================
+// CARGAR CAPAS
+// =============================
+
+// Manzana
 fetch('data/manzana.geojson')
 .then(res => res.json())
 .then(data => {
 
-  manzanaLayer = L.geoJSON(data, {
-    style: styleManzana,
+  L.geoJSON(data, {
+    style: {
+      color:"#1d4ed8",
+      weight:2,
+      fill:false
+    },
     onEachFeature: function(feature, layer){
       layer.bindPopup(
         "<b>Sector:</b> "+feature.properties.cod_sector+
@@ -81,16 +79,19 @@ fetch('data/manzana.geojson')
     }
   }).addTo(map);
 
-  map.fitBounds(manzanaLayer.getBounds());
 });
 
-// Cargar Lotes
+// Lotes
 fetch('data/lotes.geojson')
 .then(res => res.json())
 .then(data => {
 
-  lotesLayer = L.geoJSON(data, {
-    style: styleLotes,
+  L.geoJSON(data, {
+    style: {
+      color:"#16a34a",
+      weight:1,
+      fillOpacity:0.4
+    },
     onEachFeature: function(feature, layer){
       layer.bindPopup(
         "<b>Lote:</b> "+feature.properties.cod_lote+
@@ -100,81 +101,6 @@ fetch('data/lotes.geojson')
   }).addTo(map);
 
 });
-
-// 🔎 BUSCADOR TIPO GOOGLE MAPS
-
-var controlBusqueda = L.control({position:'topleft'});
-
-controlBusqueda.onAdd = function(){
-
-  var div = L.DomUtil.create('div','control-box');
-  div.innerHTML = "<b>Buscar Lote</b>";
-
-  var input = document.createElement("input");
-  input.placeholder = "Ej: Mz 3 Lt 5";
-
-  input.onkeydown = function(e){
-    if(e.key === "Enter"){
-      buscarLote(input.value);
-    }
-  };
-
-  div.appendChild(input);
-
-  return div;
-};
-
-controlBusqueda.addTo(map);
-
-// Función de búsqueda
-function buscarLote(texto){
-
-  if(!lotesLayer) return;
-
-  var partes = texto.toLowerCase();
-
-  var match = partes.match(/mz\s*(\d+).*lt\s*(\d+)/);
-
-  if(!match){
-    alert("Formato incorrecto. Ejemplo: Mz 3 Lt 5");
-    return;
-  }
-
-  var manzanaBuscada = match[1];
-  var loteBuscado = match[2];
-
-  var encontrado = false;
-
-  lotesLayer.eachLayer(function(layer){
-
-    var mz = layer.feature.properties.cod_manzana.toString();
-    var lt = layer.feature.properties.cod_lote.toString();
-
-    if(mz == manzanaBuscada && lt == loteBuscado){
-
-      map.fitBounds(layer.getBounds());
-
-      layer.setStyle({color:"red", fillOpacity:0.8});
-
-      layer.openPopup();
-
-      encontrado = true;
-
-    } else {
-      layer.setStyle({color:"#16a34a", fillOpacity:0.4});
-    }
-
-  });
-
-  if(!encontrado){
-    alert("Lote no encontrado");
-  }
-
-}
-
-</script>
-</body>
-</html>
 
 </script>
 </body>
