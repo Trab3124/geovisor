@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Geovisor Catastral</title>
+<title>Geovisor de Avance Catastral</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -12,23 +12,24 @@
 body { margin:0; font-family: Arial, sans-serif; }
 
 header {
-  background:#1f2937;
+  background:#1e40af; /* Azul */
   color:white;
-  padding:12px 20px;
-  font-size:18px;
+  padding:14px 20px;
+  font-size:20px;
   font-weight:bold;
 }
 
-#map { height: calc(100vh - 60px); }
+#map { height: calc(100vh - 65px); }
 
 .control-box {
   background:white;
   padding:12px;
   border-radius:8px;
   box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  width:220px;
 }
 
-select, button {
+select, input {
   width:100%;
   margin-top:6px;
   padding:6px;
@@ -40,7 +41,7 @@ select, button {
 <body>
 
 <header>
-  Geovisor Catastral Distrital
+  Geovisor de Avance Catastral
 </header>
 
 <div id="map"></div>
@@ -49,7 +50,6 @@ select, button {
 
 var map = L.map('map');
 
-// Base map
 var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
@@ -59,7 +59,7 @@ var lotesLayer;
 
 // Estilos
 function styleManzana() {
-  return { color:"#2563eb", weight:2, fill:false };
+  return { color:"#1d4ed8", weight:2, fill:false };
 }
 
 function styleLotes() {
@@ -99,74 +99,84 @@ fetch('data/lotes.geojson')
     }
   }).addTo(map);
 
-  crearFiltro(data);
 });
 
-// Control de capas
-var baseMaps = {
-  "OpenStreetMap": osm
-};
+// 🔎 BUSCADOR TIPO GOOGLE MAPS
 
-var overlayMaps = {};
+var controlBusqueda = L.control({position:'topleft'});
 
-var controlCapas = L.control.layers(baseMaps, overlayMaps).addTo(map);
+controlBusqueda.onAdd = function(){
 
-// Crear filtro dinámico
-function crearFiltro(data){
+  var div = L.DomUtil.create('div','control-box');
+  div.innerHTML = "<b>Buscar Lote</b>";
 
-  var manzanasUnicas = [];
+  var input = document.createElement("input");
+  input.placeholder = "Ej: Mz 3 Lt 5";
 
-  data.features.forEach(function(f){
-    var mz = f.properties.cod_manzana;
-    if(!manzanasUnicas.includes(mz)){
-      manzanasUnicas.push(mz);
+  input.onkeydown = function(e){
+    if(e.key === "Enter"){
+      buscarLote(input.value);
     }
-  });
-
-  manzanasUnicas.sort();
-
-  var control = L.control({position:'topright'});
-
-  control.onAdd = function(){
-    var div = L.DomUtil.create('div','control-box');
-    div.innerHTML = "<b>Filtrar por Manzana</b>";
-
-    var select = document.createElement("select");
-    select.innerHTML = "<option value=''>-- Todas --</option>";
-
-    manzanasUnicas.forEach(function(mz){
-      var option = document.createElement("option");
-      option.value = mz;
-      option.text = mz;
-      select.appendChild(option);
-    });
-
-    select.onchange = function(){
-      filtrarManzana(this.value);
-    };
-
-    div.appendChild(select);
-
-    return div;
   };
 
-  control.addTo(map);
-}
+  div.appendChild(input);
 
-function filtrarManzana(valor){
+  return div;
+};
+
+controlBusqueda.addTo(map);
+
+// Función de búsqueda
+function buscarLote(texto){
+
+  if(!lotesLayer) return;
+
+  var partes = texto.toLowerCase();
+
+  var match = partes.match(/mz\s*(\d+).*lt\s*(\d+)/);
+
+  if(!match){
+    alert("Formato incorrecto. Ejemplo: Mz 3 Lt 5");
+    return;
+  }
+
+  var manzanaBuscada = match[1];
+  var loteBuscado = match[2];
+
+  var encontrado = false;
 
   lotesLayer.eachLayer(function(layer){
 
-    if(valor === "" || layer.feature.properties.cod_manzana == valor){
-      layer.addTo(map);
+    var mz = layer.feature.properties.cod_manzana.toString();
+    var lt = layer.feature.properties.cod_lote.toString();
+
+    if(mz == manzanaBuscada && lt == loteBuscado){
+
+      map.fitBounds(layer.getBounds());
+
+      layer.setStyle({color:"red", fillOpacity:0.8});
+
+      layer.openPopup();
+
+      encontrado = true;
+
     } else {
-      map.removeLayer(layer);
+      layer.setStyle({color:"#16a34a", fillOpacity:0.4});
     }
 
   });
+
+  if(!encontrado){
+    alert("Lote no encontrado");
+  }
 
 }
 
 </script>
 </body>
 </html>
+
+</script>
+</body>
+</html>
+
