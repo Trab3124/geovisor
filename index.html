@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Geovisor Catastral</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<style>
+  body { margin:0; }
+  #map { height: 100vh; }
+  .control-box {
+    background: white;
+    padding: 10px;
+    font-family: Arial;
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+
+// Centro provisional (puedes cambiar luego)
+var map = L.map('map').setView([-12.05, -77.04], 15);
+
+// Base map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+var lotesLayer;
+
+// Estilos
+function styleManzana() {
+  return { color: "#0066ff", weight: 2, fill: false };
+}
+
+function styleLotes() {
+  return { color: "#00aa00", weight: 1, fillOpacity: 0.4 };
+}
+
+// Cargar Manzanas
+fetch('data/manzana.geojson')
+  .then(res => res.json())
+  .then(data => {
+    L.geoJSON(data, {
+      style: styleManzana,
+      onEachFeature: function(feature, layer) {
+        layer.bindPopup(
+          "<b>Sector:</b> " + feature.properties.cod_sector +
+          "<br><b>Manzana:</b> " + feature.properties.cod_manzana
+        );
+      }
+    }).addTo(map);
+  });
+
+// Cargar Lotes
+fetch('data/lotes.geojson')
+  .then(res => res.json())
+  .then(data => {
+    lotesLayer = L.geoJSON(data, {
+      style: styleLotes,
+      onEachFeature: function(feature, layer) {
+        layer.bindPopup(
+          "<b>Lote:</b> " + feature.properties.cod_lote +
+          "<br><b>Manzana:</b> " + feature.properties.cod_manzana
+        );
+      }
+    }).addTo(map);
+  });
+
+// CONTROL FILTRO
+var control = L.control({position: 'topright'});
+control.onAdd = function() {
+  var div = L.DomUtil.create('div', 'control-box');
+  div.innerHTML = `
+    <b>Filtrar por cod_manzana</b><br>
+    <input type="text" id="filtroManzana" placeholder="Ej: 001"><br>
+    <button onclick="filtrar()">Filtrar</button>
+    <button onclick="resetear()">Mostrar todos</button>
+  `;
+  return div;
+};
+control.addTo(map);
+
+function filtrar() {
+  var valor = document.getElementById("filtroManzana").value;
+
+  lotesLayer.eachLayer(function(layer) {
+    if (layer.feature.properties.cod_manzana == valor) {
+      layer.addTo(map).setStyle({color:"red", fillOpacity:0.7});
+    } else {
+      map.removeLayer(layer);
+    }
+  });
+}
+
+function resetear() {
+  lotesLayer.eachLayer(function(layer) {
+    layer.addTo(map).setStyle({color:"#00aa00", fillOpacity:0.4});
+  });
+}
+
+</script>
+</body>
+</html>
