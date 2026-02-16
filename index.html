@@ -9,100 +9,162 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-  body { margin:0; }
-  #map { height: 100vh; }
-  .control-box {
-    background: white;
-    padding: 10px;
-    font-family: Arial;
-  }
+body { margin:0; font-family: Arial, sans-serif; }
+
+header {
+  background:#1f2937;
+  color:white;
+  padding:12px 20px;
+  font-size:18px;
+  font-weight:bold;
+}
+
+#map { height: calc(100vh - 60px); }
+
+.control-box {
+  background:white;
+  padding:12px;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+
+select, button {
+  width:100%;
+  margin-top:6px;
+  padding:6px;
+  border-radius:4px;
+  border:1px solid #ccc;
+}
 </style>
 </head>
 <body>
+
+<header>
+  Geovisor Catastral Distrital
+</header>
 
 <div id="map"></div>
 
 <script>
 
-// Centro provisional (puedes cambiar luego)
-var map = L.map('map').setView([-12.05, -77.04], 15);
+var map = L.map('map');
 
 // Base map
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
+var manzanaLayer;
 var lotesLayer;
 
 // Estilos
 function styleManzana() {
-  return { color: "#0066ff", weight: 2, fill: false };
+  return { color:"#2563eb", weight:2, fill:false };
 }
 
 function styleLotes() {
-  return { color: "#00aa00", weight: 1, fillOpacity: 0.4 };
+  return { color:"#16a34a", weight:1, fillOpacity:0.4 };
 }
 
 // Cargar Manzanas
 fetch('data/manzana.geojson')
-  .then(res => res.json())
-  .then(data => {
-    L.geoJSON(data, {
-      style: styleManzana,
-      onEachFeature: function(feature, layer) {
-        layer.bindPopup(
-          "<b>Sector:</b> " + feature.properties.cod_sector +
-          "<br><b>Manzana:</b> " + feature.properties.cod_manzana
-        );
-      }
-    }).addTo(map);
-  });
+.then(res => res.json())
+.then(data => {
+
+  manzanaLayer = L.geoJSON(data, {
+    style: styleManzana,
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Sector:</b> "+feature.properties.cod_sector+
+        "<br><b>Manzana:</b> "+feature.properties.cod_manzana
+      );
+    }
+  }).addTo(map);
+
+  map.fitBounds(manzanaLayer.getBounds());
+});
 
 // Cargar Lotes
 fetch('data/lotes.geojson')
-  .then(res => res.json())
-  .then(data => {
-    lotesLayer = L.geoJSON(data, {
-      style: styleLotes,
-      onEachFeature: function(feature, layer) {
-        layer.bindPopup(
-          "<b>Lote:</b> " + feature.properties.cod_lote +
-          "<br><b>Manzana:</b> " + feature.properties.cod_manzana
-        );
-      }
-    }).addTo(map);
+.then(res => res.json())
+.then(data => {
+
+  lotesLayer = L.geoJSON(data, {
+    style: styleLotes,
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Lote:</b> "+feature.properties.cod_lote+
+        "<br><b>Manzana:</b> "+feature.properties.cod_manzana
+      );
+    }
+  }).addTo(map);
+
+  crearFiltro(data);
+});
+
+// Control de capas
+var baseMaps = {
+  "OpenStreetMap": osm
+};
+
+var overlayMaps = {};
+
+var controlCapas = L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+// Crear filtro dinámico
+function crearFiltro(data){
+
+  var manzanasUnicas = [];
+
+  data.features.forEach(function(f){
+    var mz = f.properties.cod_manzana;
+    if(!manzanasUnicas.includes(mz)){
+      manzanasUnicas.push(mz);
+    }
   });
 
-// CONTROL FILTRO
-var control = L.control({position: 'topright'});
-control.onAdd = function() {
-  var div = L.DomUtil.create('div', 'control-box');
-  div.innerHTML = `
-    <b>Filtrar por cod_manzana</b><br>
-    <input type="text" id="filtroManzana" placeholder="Ej: 001"><br>
-    <button onclick="filtrar()">Filtrar</button>
-    <button onclick="resetear()">Mostrar todos</button>
-  `;
-  return div;
-};
-control.addTo(map);
+  manzanasUnicas.sort();
 
-function filtrar() {
-  var valor = document.getElementById("filtroManzana").value;
+  var control = L.control({position:'topright'});
 
-  lotesLayer.eachLayer(function(layer) {
-    if (layer.feature.properties.cod_manzana == valor) {
-      layer.addTo(map).setStyle({color:"red", fillOpacity:0.7});
+  control.onAdd = function(){
+    var div = L.DomUtil.create('div','control-box');
+    div.innerHTML = "<b>Filtrar por Manzana</b>";
+
+    var select = document.createElement("select");
+    select.innerHTML = "<option value=''>-- Todas --</option>";
+
+    manzanasUnicas.forEach(function(mz){
+      var option = document.createElement("option");
+      option.value = mz;
+      option.text = mz;
+      select.appendChild(option);
+    });
+
+    select.onchange = function(){
+      filtrarManzana(this.value);
+    };
+
+    div.appendChild(select);
+
+    return div;
+  };
+
+  control.addTo(map);
+}
+
+function filtrarManzana(valor){
+
+  lotesLayer.eachLayer(function(layer){
+
+    if(valor === "" || layer.feature.properties.cod_manzana == valor){
+      layer.addTo(map);
     } else {
       map.removeLayer(layer);
     }
-  });
-}
 
-function resetear() {
-  lotesLayer.eachLayer(function(layer) {
-    layer.addTo(map).setStyle({color:"#00aa00", fillOpacity:0.4});
   });
+
 }
 
 </script>
