@@ -8,9 +8,6 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-
 <style>
 body { margin:0; font-family: Arial; }
 
@@ -22,93 +19,131 @@ header{
   font-weight:bold;
 }
 
-#map { height: calc(100vh - 65px); }
+#map { height: calc(100vh - 200px); }
 
-#panel {
+#filtroPanel{
   position:absolute;
   right:10px;
   top:80px;
-  width:320px;
+  width:300px;
   background:white;
-  border-radius:8px;
   padding:10px;
+  border-radius:8px;
   box-shadow:0 2px 8px rgba(0,0,0,0.3);
-  max-height:420px;
-  overflow:auto;
   z-index:1000;
 }
 
-#panel h3{
-  margin:5px 0;
-  font-size:14px;
+#atributosPanel{
+  height:150px;
+  background:white;
+  border-top:3px solid #1e40af;
+  overflow:auto;
+  padding:10px;
+}
+
+#atributosPanel h3{
+  margin:0 0 5px 0;
   color:#1e40af;
+  font-size:14px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+
+td{
+  border:1px solid #ddd;
+  padding:4px;
 }
 
 select{
   width:100%;
-  padding:5px;
-  margin-bottom:10px;
-}
-
-.label-selected{
-  font-size:14px;
-  font-weight:bold;
-  color:red;
-  text-shadow:1px 1px 2px white;
+  margin-bottom:8px;
+  padding:4px;
 }
 </style>
 </head>
 <body>
 
 <header>Geovisor de Avance Catastral</header>
+
 <div id="map"></div>
 
-<div id="panel">
-  <h3>Filtrar por Sector</h3>
+<div id="filtroPanel">
+  <b>Filtrar Manzana</b>
   <select id="sectorSelect">
-    <option value="">-- Seleccione Sector --</option>
+    <option value="">-- Sector --</option>
   </select>
-
-  <h3>Filtrar por Manzana</h3>
   <select id="manzanaSelect">
-    <option value="">-- Seleccione Manzana --</option>
+    <option value="">-- Manzana --</option>
   </select>
-
-  <div id="info"></div>
 </div>
+
+<div id="atributosPanel"></div>
 
 <script>
 
 var map = L.map('map',{maxZoom:22,minZoom:5})
 .setView([-11.99,-77.05],15);
 
-var osm = L.tileLayer(
+L.tileLayer(
 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-{maxZoom:22}).addTo(map);
+{maxZoom:22}
+).addTo(map);
 
-var sat = L.tileLayer(
-'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-{maxZoom:22});
-
-L.control.layers({"OSM":osm,"Satelital":sat}).addTo(map);
-
-L.Control.geocoder({defaultMarkGeocode:true}).addTo(map);
-
-var sectorLayer, manzanaLayer;
-var sectorData, manzanaData;
+// ---------------- VARIABLES ----------------
+var sectorLayer, manzanaLayer, loteLayer, puertaLayer;
+var sectorData, manzanaData, loteData, puertaData;
 var highlightLayer;
 
-// ------------------ CARGAR SECTOR ------------------
+// ---------------- TABLA ATRIBUTOS ----------------
+function mostrarAtributos(props, nombreCapa){
+  var html="<h3>Tabla de atributos - "+nombreCapa+"</h3><table>";
+  for(var k in props){
+    html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
+  }
+  html+="</table>";
+  document.getElementById("atributosPanel").innerHTML=html;
+}
+
+// ---------------- RESALTADO ----------------
+function resaltar(feature, nombreCapa){
+
+  if(highlightLayer){
+    map.removeLayer(highlightLayer);
+  }
+
+  highlightLayer=L.geoJSON(feature,{
+    style:{color:"red",weight:3,fillOpacity:0.1}
+  }).addTo(map);
+
+  map.fitBounds(highlightLayer.getBounds());
+
+  highlightLayer.eachLayer(function(l){
+    l.bindTooltip(Object.values(feature.properties)[0],{
+      permanent:true,
+      direction:"center"
+    }).openTooltip();
+  });
+
+  mostrarAtributos(feature.properties, nombreCapa);
+}
+
+// ---------------- CARGAR SECTOR ----------------
 fetch('data/tg_sector.geojson')
 .then(r=>r.json())
 .then(data=>{
   sectorData=data;
 
   sectorLayer=L.geoJSON(data,{
-    style:{color:"#6b7280",weight:2,fill:false}
+    style:{color:"#6b7280",weight:2,fill:false},
+    onEachFeature:(f,l)=>{
+      l.on("click",()=>resaltar(f,"SECTOR"));
+    }
   }).addTo(map);
 
-  // llenar combo sector
   var sectores=[...new Set(data.features.map(f=>f.properties.cod_sector))];
   sectores.sort().forEach(s=>{
     var opt=document.createElement("option");
@@ -118,76 +153,93 @@ fetch('data/tg_sector.geojson')
   });
 });
 
-// ------------------ CARGAR MANZANA ------------------
+// ---------------- CARGAR MANZANA ----------------
 fetch('data/tg_manzana.geojson')
 .then(r=>r.json())
 .then(data=>{
   manzanaData=data;
 
   manzanaLayer=L.geoJSON(data,{
-    style:{color:"#2563eb",weight:1,fill:false}
+    style:{color:"#2563eb",weight:1,fill:false},
+    onEachFeature:(f,l)=>{
+      l.on("click",()=>resaltar(f,"MANZANA"));
+    }
   }).addTo(map);
+});
 
-  // llenar combo manzana
-  var manzanas=[...new Set(data.features.map(f=>f.properties.cod_mzna))];
-  manzanas.sort().forEach(m=>{
+// ---------------- CARGAR LOTE ----------------
+fetch('data/tg_lote.geojson')
+.then(r=>r.json())
+.then(data=>{
+  loteData=data;
+
+  loteLayer=L.geoJSON(data,{
+    style:{color:"#16a34a",weight:1,fillOpacity:0.4},
+    onEachFeature:(f,l)=>{
+      l.on("click",()=>resaltar(f,"LOTE"));
+    }
+  }).addTo(map);
+});
+
+// ---------------- CARGAR PUERTA ----------------
+fetch('data/tg_puerta.geojson')
+.then(r=>r.json())
+.then(data=>{
+  puertaData=data;
+
+  puertaLayer=L.geoJSON(data,{
+    pointToLayer:(f,latlng)=>
+      L.circleMarker(latlng,{radius:3,color:"#000",fillOpacity:0.8}),
+    onEachFeature:(f,l)=>{
+      l.on("click",()=>resaltar(f,"PUERTA"));
+    }
+  }).addTo(map);
+});
+
+// ---------------- FILTRO SECTOR ----------------
+document.getElementById("sectorSelect")
+.addEventListener("change",function(){
+
+  var val=this.value;
+  var manzanaSelect=document.getElementById("manzanaSelect");
+  manzanaSelect.innerHTML='<option value="">-- Manzana --</option>';
+
+  if(!val) return;
+
+  var manzanasFiltradas=
+    manzanaData.features
+    .filter(f=>f.properties.cod_sector==val);
+
+  var codigos=[...new Set(
+    manzanasFiltradas.map(f=>f.properties.cod_mzna)
+  )];
+
+  codigos.sort().forEach(m=>{
     var opt=document.createElement("option");
     opt.value=m;
     opt.text=m;
-    document.getElementById("manzanaSelect").appendChild(opt);
+    manzanaSelect.appendChild(opt);
   });
+
 });
 
-// ------------------ FUNCION ZOOM Y RESALTADO ------------------
-function zoomToFeature(feature, tipo, campo){
-
-  if(highlightLayer){
-    map.removeLayer(highlightLayer);
-  }
-
-  highlightLayer=L.geoJSON(feature,{
-    style:{
-      color:"red",
-      weight:3,
-      fillOpacity:0.1
-    }
-  }).addTo(map);
-
-  map.fitBounds(highlightLayer.getBounds());
-
-  highlightLayer.eachLayer(function(layer){
-    layer.bindTooltip(feature.properties[campo],{
-      permanent:true,
-      direction:"center",
-      className:"label-selected"
-    }).openTooltip();
-  });
-
-  document.getElementById("info").innerHTML=
-    "<h3>Seleccionado: "+tipo+"</h3>";
-}
-
-// ------------------ EVENTO SECTOR ------------------
-document.getElementById("sectorSelect").addEventListener("change",function(){
+// ---------------- FILTRO MANZANA ----------------
+document.getElementById("manzanaSelect")
+.addEventListener("change",function(){
 
   var val=this.value;
   if(!val) return;
 
-  var feature=sectorData.features.find(f=>f.properties.cod_sector==val);
-  zoomToFeature(feature,"SECTOR","cod_sector");
-});
+  var feature=
+    manzanaData.features
+    .find(f=>f.properties.cod_mzna==val);
 
-// ------------------ EVENTO MANZANA ------------------
-document.getElementById("manzanaSelect").addEventListener("change",function(){
-
-  var val=this.value;
-  if(!val) return;
-
-  var feature=manzanaData.features.find(f=>f.properties.cod_mzna==val);
-  zoomToFeature(feature,"MANZANA","cod_mzna");
+  resaltar(feature,"MANZANA");
 });
 
 </script>
 </body>
 </html>
+
+
 
