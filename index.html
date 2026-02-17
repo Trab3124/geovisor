@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<!-- Buscador tipo Google Maps (Geocoder OSM) -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<!-- Geocoder -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <style>
@@ -30,7 +30,7 @@ header {
 <body>
 
 <header>
-  Geovisor de Avance Catastral
+Geovisor de Avance Catastral
 </header>
 
 <div id="map"></div>
@@ -38,71 +38,113 @@ header {
 <script>
 
 // Crear mapa
-var map = L.map('map').setView([-11.99, -77.05], 14); // Ajusta si quieres
+var map = L.map('map').setView([-11.99, -77.05], 15);
 
-// Base OpenStreetMap
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// Base OSM
+var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
-// =============================
-// 🔎 BUSCADOR TIPO GOOGLE MAPS
-// =============================
+// ===========================
+// BUSCADOR DIRECCIÓN / LUGAR
+// ===========================
 
 L.Control.geocoder({
     defaultMarkGeocode: true,
-    placeholder: "Buscar dirección...",
-    errorMessage: "No se encontró la dirección"
+    placeholder: "Buscar dirección o lugar...",
+    errorMessage: "No se encontró"
 }).addTo(map);
 
 
-// =============================
-// CARGAR CAPAS
-// =============================
+// ===========================
+// FUNCION PARA CARGAR CAPAS
+// ===========================
 
-// Manzana
-fetch('data/manzana.geojson')
-.then(res => res.json())
-.then(data => {
+function cargarCapa(url, estilo, popupBuilder) {
 
-  L.geoJSON(data, {
-    style: {
-      color:"#1d4ed8",
-      weight:2,
-      fill:false
-    },
-    onEachFeature: function(feature, layer){
-      layer.bindPopup(
-        "<b>Sector:</b> "+feature.properties.cod_sector+
-        "<br><b>Manzana:</b> "+feature.properties.cod_manzana
-      );
-    }
-  }).addTo(map);
+  return fetch(url)
+  .then(res => res.json())
+  .then(data => {
 
-});
+    return L.geoJSON(data, {
+      style: estilo,
+      onEachFeature: function(feature, layer){
+        layer.bindPopup(popupBuilder(feature.properties));
+      }
+    });
 
-// Lotes
-fetch('data/lotes.geojson')
-.then(res => res.json())
-.then(data => {
+  });
+}
 
-  L.geoJSON(data, {
-    style: {
-      color:"#16a34a",
-      weight:1,
-      fillOpacity:0.4
-    },
-    onEachFeature: function(feature, layer){
-      layer.bindPopup(
-        "<b>Lote:</b> "+feature.properties.cod_lote+
-        "<br><b>Manzana:</b> "+feature.properties.cod_manzana
-      );
-    }
-  }).addTo(map);
+
+// ===========================
+// CARGA DE CAPAS
+// ===========================
+
+Promise.all([
+
+  cargarCapa('data/tg_sector.geojson',
+    {color:"#6b7280", weight:2, fill:false},
+    p => "<b>Sector:</b> "+p.cod_sector+"<br><b>Ubigeo:</b> "+p.cod_ubigeo),
+
+  cargarCapa('data/tg_manzana.geojson',
+    {color:"#2563eb", weight:2, fill:false},
+    p => "<b>Sector:</b> "+p.cod_sector+"<br><b>Manzana:</b> "+p.cod_mzna),
+
+  cargarCapa('data/tg_lote.geojson',
+    {color:"#16a34a", weight:1, fillOpacity:0.4},
+    p => "<b>Lote:</b> "+p.cod_lote+
+         "<br><b>Manzana:</b> "+p.cod_mzna+
+         "<br><b>Área:</b> "+p.area),
+
+  cargarCapa('data/tg_edifica.geojson',
+    {color:"#f97316", weight:1},
+    p => "<b>Edificación:</b> "+p.cod_edific+
+         "<br><b>Lote:</b> "+p.cod_lote+
+         "<br><b>Área:</b> "+p.area),
+
+  cargarCapa('data/tg_construccion.geojson',
+    {color:"#dc2626", weight:1},
+    p => "<b>Piso:</b> "+p.cod_piso+
+         "<br><b>Edif:</b> "+p.cod_edific+
+         "<br><b>Área:</b> "+p.area),
+
+  cargarCapa('data/tg_construccion_2.geojson',
+    {color:"#9333ea", weight:1},
+    p => "<b>Piso:</b> "+p.cod_piso+
+         "<br><b>Categoría:</b> "+p.categoria+
+         "<br><b>Área:</b> "+p.area),
+
+  cargarCapa('data/tg_puerta.geojson',
+    {color:"#000000", weight:1},
+    p => "<b>Tipo:</b> "+p.tipo+
+         "<br><b>N° Municipal:</b> "+p.num_munici+
+         "<br><b>Orden:</b> "+p.orden),
+
+  cargarCapa('data/uca.geojson',
+    {color:"#0891b2", weight:1},
+    p => "<b>Uso:</b> "+p.USO+
+         "<br><b>Piso:</b> "+p.cod_piso)
+
+]).then(function(layers){
+
+  var overlays = {
+    "Sector": layers[0],
+    "Manzana": layers[1],
+    "Lote": layers[2],
+    "Edificación": layers[3],
+    "Construcción": layers[4],
+    "Construcción 2": layers[5],
+    "Puerta": layers[6],
+    "UCA": layers[7]
+  };
+
+  layers.forEach(layer => layer.addTo(map));
+
+  L.control.layers(null, overlays, {collapsed:false}).addTo(map);
 
 });
 
 </script>
 </body>
 </html>
-
