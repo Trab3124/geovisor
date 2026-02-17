@@ -40,8 +40,8 @@ Geovisor de Avance Catastral
 // Crear mapa
 var map = L.map('map').setView([-11.99, -77.05], 15);
 
-// Base OSM
-var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+// Base OpenStreetMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
@@ -57,93 +57,194 @@ L.Control.geocoder({
 
 
 // ===========================
-// FUNCION PARA CARGAR CAPAS
+// CAPAS
 // ===========================
 
-function cargarCapa(url, estilo, popupBuilder) {
+var overlays = {};
 
-  return fetch(url)
-  .then(res => res.json())
-  .then(data => {
+// -------- SECTOR --------
+fetch('data/tg_sector.geojson')
+.then(res => res.json())
+.then(data => {
 
-    return L.geoJSON(data, {
-      style: estilo,
-      onEachFeature: function(feature, layer){
-        layer.bindPopup(popupBuilder(feature.properties));
-      }
-    });
+  var layer = L.geoJSON(data, {
+    style: {color:"#6b7280", weight:2, fill:false},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Sector:</b> "+feature.properties.cod_sector+
+        "<br><b>Ubigeo:</b> "+feature.properties.cod_ubigeo
+      );
+    }
+  });
+
+  overlays["Sector"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- MANZANA --------
+fetch('data/tg_manzana.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#2563eb", weight:2, fill:false},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Sector:</b> "+feature.properties.cod_sector+
+        "<br><b>Manzana:</b> "+feature.properties.cod_mzna
+      );
+    }
+  });
+
+  overlays["Manzana"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- LOTE --------
+fetch('data/tg_lote.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#16a34a", weight:1, fillOpacity:0.4},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Lote:</b> "+feature.properties.cod_lote+
+        "<br><b>Manzana:</b> "+feature.properties.cod_mzna+
+        "<br><b>Área:</b> "+feature.properties.area
+      );
+    }
+  });
+
+  overlays["Lote"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- EDIFICACIÓN --------
+fetch('data/tg_edifica.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#f97316", weight:1},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Edificación:</b> "+feature.properties.cod_edific+
+        "<br><b>Lote:</b> "+feature.properties.cod_lote+
+        "<br><b>Área:</b> "+feature.properties.area
+      );
+    }
+  });
+
+  overlays["Edificación"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- CONSTRUCCIÓN --------
+fetch('data/tg_construccion.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#dc2626", weight:1},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Piso:</b> "+feature.properties.cod_piso+
+        "<br><b>Edificación:</b> "+feature.properties.cod_edific+
+        "<br><b>Área:</b> "+feature.properties.area
+      );
+    }
+  });
+
+  overlays["Construcción"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- CONSTRUCCIÓN 2 --------
+fetch('data/tg_construccion_2.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#9333ea", weight:1},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Piso:</b> "+feature.properties.cod_piso+
+        "<br><b>Categoría:</b> "+feature.properties.categoria+
+        "<br><b>Área:</b> "+feature.properties.area
+      );
+    }
+  });
+
+  overlays["Construcción 2"] = layer;
+  layer.addTo(map);
+});
+
+
+// -------- PUERTA (PUNTOS PEQUEÑOS) --------
+fetch('data/tg_puerta.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+
+    pointToLayer: function(feature, latlng) {
+      return L.circleMarker(latlng, {
+        radius: 3,
+        color: "#000000",
+        weight: 1,
+        fillColor: "#000000",
+        fillOpacity: 0.9
+      });
+    },
+
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Tipo:</b> "+feature.properties.tipo+
+        "<br><b>N° Municipal:</b> "+feature.properties.num_munici+
+        "<br><b>Orden:</b> "+feature.properties.orden
+      );
+    }
 
   });
-}
 
-
-// ===========================
-// CARGA DE CAPAS
-// ===========================
-
-Promise.all([
-
-  cargarCapa('data/tg_sector.geojson',
-    {color:"#6b7280", weight:2, fill:false},
-    p => "<b>Sector:</b> "+p.cod_sector+"<br><b>Ubigeo:</b> "+p.cod_ubigeo),
-
-  cargarCapa('data/tg_manzana.geojson',
-    {color:"#2563eb", weight:2, fill:false},
-    p => "<b>Sector:</b> "+p.cod_sector+"<br><b>Manzana:</b> "+p.cod_mzna),
-
-  cargarCapa('data/tg_lote.geojson',
-    {color:"#16a34a", weight:1, fillOpacity:0.4},
-    p => "<b>Lote:</b> "+p.cod_lote+
-         "<br><b>Manzana:</b> "+p.cod_mzna+
-         "<br><b>Área:</b> "+p.area),
-
-  cargarCapa('data/tg_edifica.geojson',
-    {color:"#f97316", weight:1},
-    p => "<b>Edificación:</b> "+p.cod_edific+
-         "<br><b>Lote:</b> "+p.cod_lote+
-         "<br><b>Área:</b> "+p.area),
-
-  cargarCapa('data/tg_construccion.geojson',
-    {color:"#dc2626", weight:1},
-    p => "<b>Piso:</b> "+p.cod_piso+
-         "<br><b>Edif:</b> "+p.cod_edific+
-         "<br><b>Área:</b> "+p.area),
-
-  cargarCapa('data/tg_construccion_2.geojson',
-    {color:"#9333ea", weight:1},
-    p => "<b>Piso:</b> "+p.cod_piso+
-         "<br><b>Categoría:</b> "+p.categoria+
-         "<br><b>Área:</b> "+p.area),
-
-  cargarCapa('data/tg_puerta.geojson',
-    {color:"#000000", weight:1},
-    p => "<b>Tipo:</b> "+p.tipo+
-         "<br><b>N° Municipal:</b> "+p.num_munici+
-         "<br><b>Orden:</b> "+p.orden),
-
-  cargarCapa('data/uca.geojson',
-    {color:"#0891b2", weight:1},
-    p => "<b>Uso:</b> "+p.USO+
-         "<br><b>Piso:</b> "+p.cod_piso)
-
-]).then(function(layers){
-
-  var overlays = {
-    "Sector": layers[0],
-    "Manzana": layers[1],
-    "Lote": layers[2],
-    "Edificación": layers[3],
-    "Construcción": layers[4],
-    "Construcción 2": layers[5],
-    "Puerta": layers[6],
-    "UCA": layers[7]
-  };
-
-  layers.forEach(layer => layer.addTo(map));
-
-  L.control.layers(null, overlays, {collapsed:false}).addTo(map);
-
+  overlays["Puerta"] = layer;
+  layer.addTo(map);
 });
+
+
+// -------- UCA --------
+fetch('data/uca.geojson')
+.then(res => res.json())
+.then(data => {
+
+  var layer = L.geoJSON(data, {
+    style: {color:"#0891b2", weight:1},
+    onEachFeature: function(feature, layer){
+      layer.bindPopup(
+        "<b>Uso:</b> "+feature.properties.USO+
+        "<br><b>Piso:</b> "+feature.properties.cod_piso
+      );
+    }
+  });
+
+  overlays["UCA"] = layer;
+  layer.addTo(map);
+});
+
+
+// ===========================
+// CONTROL DE CAPAS
+// ===========================
+
+setTimeout(function(){
+  L.control.layers(null, overlays, {collapsed:false}).addTo(map);
+}, 1500);
 
 </script>
 </body>
