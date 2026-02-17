@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Gestión Municipal</title>
+    <title>Geovisor Catastral Pro - Filtro por Clic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,7 +15,7 @@
             display: flex; align-items: center; height: 55px; z-index: 1001; position: relative;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        #map { height: calc(100vh - 55px); width: 100%; background: #e5e7eb; }
+        #map { height: calc(100vh - 55px); width: 100%; background: #e5e7eb; cursor: crosshair; }
 
         .sidebar-left {
             position: absolute; top: 65px; left: 10px; width: 340px; z-index: 1000;
@@ -44,6 +44,9 @@
         
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
+        
+        /* Tooltip para indicar que el lote es clickeable */
+        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -66,7 +69,7 @@
                 <option value="TG_CONSTRUCCION">Construcciones</option>
                 <option value="TG_PUERTA">Puertas</option>
             </select>
-            <span class="close-btn" onclick="closeResults()">&times;</span>
+            <span class="close-btn" onclick="resetFilters()">&times;</span>
         </div>
         <div id="results-content" class="scroll-area"></div>
     </div>
@@ -74,6 +77,7 @@
 
 <div id="search-panel" class="panel">
     <h3>Búsqueda Jerárquica</h3>
+    <p style="font-size: 10px; color: #1e40af; margin-top: -5px;">* Haz clic en un lote del mapa para filtrar</p>
     <div style="margin-bottom:8px">
         <label>Sector</label>
         <select id="sel-sector"><option value="">Seleccione...</option></select>
@@ -99,12 +103,12 @@
 
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
-        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1 },
-        'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1 },
-        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1 },
-        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1 },
-        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1 },
-        'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1 }
+        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
+        'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1, interactive: false },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
+        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
+        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
+        'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1, interactive: false }
     };
 
     let geoLayers = {};
@@ -120,13 +124,36 @@
                     style: styles[id],
                     pointToLayer: (f, latlng) => id === 'tg_puerta' ? L.circleMarker(latlng, styles[id]) : null,
                     onEachFeature: (f, l) => {
-                        l.on('click', (e) => { L.DomEvent.stopPropagation(e); identifyClick(e.latlng); });
+                        // Solo la capa LOTE activa el filtro por clic
+                        if (id === 'tg_lote') {
+                            l.on('click', (e) => {
+                                L.DomEvent.stopPropagation(e);
+                                autoFilterByLote(f.properties);
+                            });
+                        }
                     }
                 }).addTo(map);
                 addLayerCheckbox(id);
                 if(id === 'tg_sector') populateSectors(data);
             } catch(e) { console.warn("Error cargando " + id); }
         }
+    }
+
+    // --- FUNCIÓN CLAVE: FILTRO AUTOMÁTICO AL HACER CLIC ---
+    function autoFilterByLote(props) {
+        // 1. Actualizar valores en los selectores
+        sSec.value = props.cod_sector;
+        
+        // Disparar manualmente el evento change del sector para cargar manzanas
+        updateManzanas(() => {
+            sMzn.value = props.cod_mzna;
+            // Disparar manualmente el evento change de manzana para cargar lotes
+            updateLotes(() => {
+                sLot.value = props.cod_lote;
+                // Ejecutar la lógica de filtrado visual final
+                executeFinalFilter();
+            });
+        });
     }
 
     function addLayerCheckbox(id) {
@@ -140,24 +167,6 @@
             else map.removeLayer(geoLayers[id]);
         };
         list.appendChild(div);
-    }
-
-    function identifyClick(latlng) {
-        let found = [];
-        for (let id in geoLayers) {
-            if (map.hasLayer(geoLayers[id])) {
-                geoLayers[id].eachLayer(l => {
-                    const match = (l.getBounds && l.getBounds().contains(latlng)) || 
-                                  (l.getLatLng && latlng.distanceTo(l.getLatLng()) < 5);
-                    if (match) found.push({ layer: id.toUpperCase(), props: l.feature.properties, obj: l });
-                });
-            }
-        }
-        if (found.length > 0) {
-            currentResultsData = found;
-            updateResultsUI();
-            highlightBorders(found.map(f => f.obj));
-        }
     }
 
     function updateResultsUI() {
@@ -178,30 +187,26 @@
             return 0;
         });
 
-        if (data.length === 0) {
-            html = "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos para esta selección.</p>";
-        } else {
-            data.forEach((item) => {
-                let badge = '';
-                if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
-                if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+        data.forEach((item) => {
+            let badge = '';
+            if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
+            if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
 
-                html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
-                            <span>CAPA: ${item.layer}</span>
-                            ${badge}
-                         </div>`;
-                html += `<table>`;
-                for (let key in item.props) {
-                    let val = item.props[key];
-                    if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
-                    html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
-                }
-                html += `</table>`;
-            });
-        }
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
+                        <span>CAPA: ${item.layer}</span>
+                        ${badge}
+                     </div>`;
+            html += `<table>`;
+            for (let key in item.props) {
+                let val = item.props[key];
+                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
+                html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
+            }
+            html += `</table>`;
+        });
         
-        content.innerHTML = html;
-        panel.style.display = 'flex'; // Asegura que se muestre
+        content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
+        panel.style.display = 'flex';
     }
 
     function zoomToFid(layerId, fidValue) {
@@ -225,7 +230,7 @@
         });
     }
 
-    // BUSCADOR JERÁRQUICO
+    // --- LÓGICA DE SELECTORES ---
     const sSec = document.getElementById('sel-sector'), sMzn = document.getElementById('sel-mzna'), sLot = document.getElementById('sel-lote');
 
     function populateSectors(data) {
@@ -233,17 +238,19 @@
         items.forEach(i => sSec.innerHTML += `<option value="${i}">${i}</option>`);
     }
 
-    sSec.onchange = () => {
-        sMzn.innerHTML = '<option value="">Seleccione...</option>'; sLot.innerHTML = '<option value="">Seleccione...</option>';
+    function updateManzanas(callback) {
+        sMzn.innerHTML = '<option value="">Seleccione...</option>';
+        sLot.innerHTML = '<option value="">Seleccione...</option>';
         sMzn.disabled = !sSec.value;
         if(sSec.value) {
             let list = [];
             geoLayers['tg_manzana'].eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value) list.push(l.feature.properties.cod_mzna); });
             [...new Set(list)].sort().forEach(m => sMzn.innerHTML += `<option value="${m}">${m}</option>`);
         }
-    };
+        if(callback) callback();
+    }
 
-    sMzn.onchange = () => {
+    function updateLotes(callback) {
         sLot.innerHTML = '<option value="">Seleccione...</option>';
         sLot.disabled = !sMzn.value;
         if(sMzn.value) {
@@ -251,9 +258,10 @@
             geoLayers['tg_lote'].eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value && l.feature.properties.cod_mzna == sMzn.value) list.push(l.feature.properties.cod_lote); });
             [...new Set(list)].sort().forEach(lo => sLot.innerHTML += `<option value="${lo}">${lo}</option>`);
         }
-    };
+        if(callback) callback();
+    }
 
-    sLot.onchange = () => {
+    function executeFinalFilter() {
         const sec = sSec.value, mzn = sMzn.value, lot = sLot.value;
         if(!lot) return;
         currentResultsData = [];
@@ -285,10 +293,14 @@
         if (currentResultsData.length > 0) {
             map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 22 });
             document.getElementById('filter-layer-results').value = 'ALL';
-            updateResultsUI(); // Aquí se activa el panel
+            updateResultsUI();
             highlightBorders(currentResultsData.map(d => d.obj));
         }
-    };
+    }
+
+    sSec.onchange = () => updateManzanas();
+    sMzn.onchange = () => updateLotes();
+    sLot.onchange = () => executeFinalFilter();
 
     function resetFilters() {
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
