@@ -10,113 +10,38 @@
 
     <style>
         body { margin:0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; overflow: hidden; }
-
         header {
-            background: #1e40af;
-            color: white;
-            padding: 14px 20px;
-            font-size: 20px;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 60px;
-            box-sizing: border-box;
-            z-index: 1001;
-            position: relative;
+            background: #1e40af; color: white; padding: 14px 20px; font-size: 20px; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center; height: 60px; box-sizing: border-box;
+            z-index: 1001; position: relative;
         }
-
         #map { height: calc(100vh - 60px); width: 100%; }
-
         .sidebar-left {
-            position: absolute;
-            top: 75px;
-            left: 10px;
-            width: 330px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: calc(100vh - 90px);
+            position: absolute; top: 75px; left: 10px; width: 330px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 90px);
         }
-
-        .panel {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            display: flex;
-            flex-direction: column;
-        }
-
-        #results-panel {
-            display: none;
-            max-height: 450px;
-            border-top: 4px solid #1e40af;
-        }
-
-        .scroll-area {
-            overflow-y: auto;
-            margin-top: 10px;
-        }
-
-        #search-panel {
-            position: absolute;
-            right: 10px;
-            top: 75px;
-            width: 280px;
-            z-index: 1000;
-        }
-
+        .panel { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+        #results-panel { display: none; max-height: 450px; border-top: 4px solid #1e40af; }
+        .scroll-area { overflow-y: auto; margin-top: 10px; }
+        #search-panel { position: absolute; right: 10px; top: 75px; width: 280px; z-index: 1000; }
         h3 { margin: 0 0 10px 0; font-size: 14px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-
-        .results-header-flex {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 5px;
-        }
-
-        #filter-layer-results {
-            padding: 4px;
-            font-size: 11px;
-            border: 1px solid #1e40af;
-            border-radius: 4px;
-            background: #f1f5f9;
-            color: #1e40af;
-            font-weight: bold;
-        }
-
+        .results-header-flex { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
+        #filter-layer-results { padding: 4px; font-size: 11px; border: 1px solid #1e40af; border-radius: 4px; background: #f1f5f9; color: #1e40af; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }
         td { border: 1px solid #ddd; padding: 6px; word-break: break-all; }
         .attr-key { font-weight: bold; background: #f8fafc; width: 40%; color: #334155; }
-
         .control-group { margin-bottom: 8px; }
         label { font-size: 11px; font-weight: bold; color: #444; }
         select { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; margin-top: 3px; }
-        
-        button {
-            width: 100%; padding: 8px; background: #1e40af; color: white; border: none; 
-            border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold;
-        }
-
+        button { width: 100%; padding: 8px; background: #1e40af; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold; }
         .layer-row { display: flex; align-items: center; font-size: 13px; margin-bottom: 6px; }
         .layer-row input { margin-right: 10px; cursor: pointer; }
-
         .close-results { color: #ef4444; cursor: pointer; font-size: 16px; font-weight: bold; }
-        
-        /* Estilo para destacar selección */
-        .selected-feature {
-            stroke: #ffff00;
-            stroke-width: 5;
-            fill-opacity: 0.8;
-        }
     </style>
 </head>
 <body>
 
 <header>Geovisor de Avance Catastral</header>
-
 <div id="map"></div>
 
 <div class="sidebar-left">
@@ -124,7 +49,6 @@
         <h3>Capas Catastrales</h3>
         <div id="layer-list"></div>
     </div>
-
     <div id="results-panel" class="panel">
         <div class="results-header-flex">
             <h3 style="margin:0">Resultados</h3>
@@ -159,7 +83,6 @@
 </div>
 
 <script>
-    // 1. Inicializar Mapa
     var map = L.map('map', { zoomControl: false }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -167,15 +90,14 @@
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
     L.control.layers({"Callejero": osm, "Satelital": sat}, null, {position: 'topright'}).addTo(map);
 
-    // 2. Variables de Capas
-    const layerNames = {
-        'tg_sector': 'Sectores',
-        'tg_manzana': 'Manzanas',
-        'tg_lote': 'Lotes',
-        'tg_edifica': 'Edificaciones',
-        'tg_construccion': 'Construcciones',
-        'tg_puerta': 'Puertas'
-    };
+    const layerConfig = [
+        { id: 'tg_sector', name: 'Sectores' },
+        { id: 'tg_manzana', name: 'Manzanas' },
+        { id: 'tg_lote', name: 'Lotes' },
+        { id: 'tg_edifica', name: 'Edificaciones' },
+        { id: 'tg_construccion', name: 'Construcciones' },
+        { id: 'tg_puerta', name: 'Puertas' }
+    ];
 
     const styles = {
         'tg_sector': { color: "#64748b", weight: 3, fill: false },
@@ -188,19 +110,18 @@
 
     let geoLayers = {};
     let currentResultsData = []; 
-    let highlightedLayer = null;
+    let highlightedLayers = []; // Ahora manejamos múltiples resaltados
 
-    // 3. Carga de Capas
     async function loadData() {
-        for (let key in layerNames) {
+        for (let config of layerConfig) {
             try {
-                const response = await fetch(`data/${key}.geojson`);
-                if (!response.ok) throw new Error();
+                const response = await fetch(`data/${config.id}.geojson`);
+                if (!response.ok) continue;
                 const data = await response.json();
 
-                geoLayers[key] = L.geoJSON(data, {
-                    style: styles[key],
-                    pointToLayer: (feature, latlng) => key === 'tg_puerta' ? L.circleMarker(latlng, styles[key]) : null,
+                geoLayers[config.id] = L.geoJSON(data, {
+                    style: styles[config.id],
+                    pointToLayer: (feature, latlng) => config.id === 'tg_puerta' ? L.circleMarker(latlng, styles[config.id]) : null,
                     onEachFeature: (feature, layer) => {
                         layer.on('click', (e) => {
                             L.DomEvent.stopPropagation(e);
@@ -209,100 +130,84 @@
                     }
                 }).addTo(map);
 
-                // Crear Checkbox
-                addLayerCheckbox(key);
-                
-                // Llenar Buscador si es Sector
-                if (key === 'tg_sector') populateSectors(data);
-
-            } catch (err) {
-                console.warn(`No se pudo cargar: ${key}.geojson`);
-            }
+                addLayerCheckbox(config.id, config.name);
+                if (config.id === 'tg_sector') populateSectors(data);
+            } catch (err) {}
         }
     }
 
-    function addLayerCheckbox(key) {
+    function addLayerCheckbox(id, name) {
         const list = document.getElementById('layer-list');
         const div = document.createElement('div');
         div.className = 'layer-row';
-        div.innerHTML = `<input type="checkbox" checked id="chk-${key}"> <label for="chk-${key}">${layerNames[key]}</label>`;
+        div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${name}</label>`;
         div.querySelector('input').onclick = (e) => {
-            if (e.target.checked) map.addLayer(geoLayers[key]);
-            else map.removeLayer(geoLayers[key]);
+            if (e.target.checked) map.addLayer(geoLayers[id]);
+            else map.removeLayer(geoLayers[id]);
         };
         list.appendChild(div);
     }
 
-    // 4. Lógica de Identificación y Resultados
     function processClick(latlng) {
         let found = [];
         for (let key in geoLayers) {
             if (map.hasLayer(geoLayers[key])) {
                 geoLayers[key].eachLayer(layer => {
-                    let isMatch = false;
-                    if (layer.getBounds && layer.getBounds().contains(latlng)) isMatch = true;
-                    else if (layer.getLatLng && latlng.distanceTo(layer.getLatLng()) < 10) isMatch = true;
-
-                    if (isMatch) {
-                        found.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
-                    }
+                    let match = (layer.getBounds && layer.getBounds().contains(latlng)) || 
+                                (layer.getLatLng && latlng.distanceTo(layer.getLatLng()) < 10);
+                    if (match) found.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
                 });
             }
         }
         if (found.length > 0) {
             currentResultsData = found;
             updateResultsUI();
-            highlight(found[0].obj);
+            highlight(found.map(f => f.obj));
         }
     }
 
     function updateResultsUI() {
         const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
-        const panel = document.getElementById('results-panel');
-        
         let html = "";
         let dataToDisplay = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
 
         if (dataToDisplay.length === 0) {
-            html = "<p style='font-size:12px; color:gray; text-align:center;'>Sin datos para esta capa.</p>";
+            html = "<p style='text-align:center; font-size:12px; color:gray;'>Sin datos.</p>";
         } else {
             dataToDisplay.forEach(item => {
                 html += `<div style="background:#1e40af; color:white; padding:4px 8px; font-size:11px; margin-top:10px;">CAPA: ${item.layer}</div>`;
                 html += `<table>`;
-                for (let p in item.props) {
-                    html += `<tr><td class="attr-key">${p}</td><td>${item.props[p] || '-'}</td></tr>`;
-                }
+                for (let p in item.props) html += `<tr><td class="attr-key">${p}</td><td>${item.props[p] || '-'}</td></tr>`;
                 html += `</table>`;
             });
         }
         content.innerHTML = html;
-        panel.style.display = 'flex';
+        document.getElementById('results-panel').style.display = 'flex';
     }
 
-    function highlight(layer) {
-        if (highlightedLayer) {
-            geoLayers[highlightedLayer.key].resetStyle(highlightedLayer.layer);
-        }
-        // Encontrar a qué capa pertenece para resetear luego
-        let parentKey = Object.keys(geoLayers).find(k => geoLayers[k].hasLayer(layer));
-        highlightedLayer = { layer: layer, key: parentKey };
+    function highlight(layers) {
+        clearHighlight();
+        layers.forEach(l => {
+            if (l.setStyle) l.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.7 });
+            highlightedLayers.push(l);
+        });
+    }
 
-        if (layer.setStyle) {
-            layer.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.7 });
-            layer.bringToFront();
-        }
+    function clearHighlight() {
+        highlightedLayers.forEach(l => {
+            let key = Object.keys(geoLayers).find(k => geoLayers[k].hasLayer(l));
+            if (key) geoLayers[key].resetStyle(l);
+        });
+        highlightedLayers = [];
     }
 
     function closeResults() {
         document.getElementById('results-panel').style.display = 'none';
-        if (highlightedLayer) {
-            geoLayers[highlightedLayer.key].resetStyle(highlightedLayer.layer);
-            highlightedLayer = null;
-        }
+        clearHighlight();
     }
 
-    // 5. Buscador Jerárquico
+    // BUSCADOR JERÁRQUICO CON FILTRO ESTRICTO
     const sSec = document.getElementById('sel-sector');
     const sMzn = document.getElementById('sel-mzna');
     const sLot = document.getElementById('sel-lote');
@@ -316,8 +221,7 @@
         sMzn.innerHTML = '<option value="">Seleccione Manzana...</option>';
         sLot.innerHTML = '<option value="">Seleccione Lote...</option>';
         sMzn.disabled = !sSec.value; sLot.disabled = true;
-
-        if (sSec.value && geoLayers['tg_manzana']) {
+        if (sSec.value) {
             let mzns = [];
             geoLayers['tg_manzana'].eachLayer(l => {
                 if (l.feature.properties.cod_sector == sSec.value) mzns.push(l.feature.properties.cod_mzna);
@@ -329,11 +233,11 @@
     sMzn.onchange = () => {
         sLot.innerHTML = '<option value="">Seleccione Lote...</option>';
         sLot.disabled = !sMzn.value;
-
-        if (sMzn.value && geoLayers['tg_lote']) {
+        if (sMzn.value) {
             let lots = [];
             geoLayers['tg_lote'].eachLayer(l => {
-                if (l.feature.properties.cod_mzna == sMzn.value) lots.push(l.feature.properties.cod_lote);
+                if (l.feature.properties.cod_sector == sSec.value && l.feature.properties.cod_mzna == sMzn.value) 
+                    lots.push(l.feature.properties.cod_lote);
             });
             [...new Set(lots)].sort().forEach(lt => sLot.innerHTML += `<option value="${lt}">${lt}</option>`);
         }
@@ -341,33 +245,28 @@
 
     sLot.onchange = () => {
         if (!sLot.value) return;
-        let target = null;
-        geoLayers['tg_lote'].eachLayer(l => {
-            if (l.feature.properties.cod_lote == sLot.value && l.feature.properties.cod_mzna == sMzn.value) target = l;
-        });
+        currentResultsData = [];
+        let zoomLayer = null;
 
-        if (target) {
-            map.fitBounds(target.getBounds());
-            // Relacionar espacialmente:
-            currentResultsData = [];
-            const bbox = target.getBounds();
-            
-            // Buscar en todas las capas lo que esté dentro de ese lote
-            for (let key in geoLayers) {
-                geoLayers[key].eachLayer(l => {
-                    if ((l.getBounds && bbox.intersects(l.getBounds())) || (l.getLatLng && bbox.contains(l.getLatLng()))) {
-                        currentResultsData.push({ layer: key.toUpperCase(), props: l.feature.properties, obj: l });
-                    }
-                });
-            }
-            highlight(target);
-            updateResultsUI();
+        // FILTRO ESTRICTO ALFANUMÉRICO
+        for (let key in geoLayers) {
+            geoLayers[key].eachLayer(l => {
+                const p = l.feature.properties;
+                // Condición: Sector, Manzana y Lote deben coincidir exactamente
+                if (p.cod_sector == sSec.value && p.cod_mzna == sMzn.value && p.cod_lote == sLot.value) {
+                    currentResultsData.push({ layer: key.toUpperCase(), props: p, obj: l });
+                    if (key === 'tg_lote') zoomLayer = l;
+                }
+            });
         }
+
+        if (zoomLayer) map.fitBounds(zoomLayer.getBounds());
+        highlight(currentResultsData.map(d => d.obj));
+        updateResultsUI();
     };
 
     function resetFilters() {
-        sSec.value = ""; sMzn.disabled = sLot.disabled = true;
-        closeResults();
+        sSec.value = ""; sMzn.disabled = sLot.disabled = true; closeResults();
     }
 
     loadData();
