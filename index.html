@@ -11,16 +11,14 @@
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <style>
-        /* ESTILO BASADO EN TU CÓDIGO */
         body { margin:0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; overflow: hidden; }
 
         header {
-            background: #1e40af; /* Azul Institucional */
+            background: #1e40af;
             color: white;
             padding: 14px 20px;
             font-size: 20px;
             font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -32,12 +30,11 @@
 
         #map { height: calc(100vh - 65px); width: 100%; }
 
-        /* CONTENEDOR IZQUIERDO UNIFICADO */
         .sidebar-left {
             position: absolute;
             top: 80px;
             left: 10px;
-            width: 300px;
+            width: 320px;
             z-index: 1000;
             display: flex;
             flex-direction: column;
@@ -55,18 +52,17 @@
             flex-direction: column;
         }
 
-        /* PANEL DE RESULTADOS (DEBAJO DE CAPAS) */
         #results-panel {
-            display: none; /* Se activa al hacer clic */
-            max-height: 400px;
+            display: none;
+            max-height: 500px;
         }
 
         .scroll-area {
             overflow-y: auto;
             margin-top: 10px;
+            border-top: 1px solid #eee;
         }
 
-        /* BUSCADOR DERECHO */
         #search-panel {
             position: absolute;
             right: 10px;
@@ -79,18 +75,33 @@
             margin: 0 0 10px 0; 
             font-size: 14px; 
             color: #1e40af; 
-            border-bottom: 1px solid #ddd; 
-            padding-bottom: 5px;
             text-transform: uppercase;
         }
 
-        /* TABLAS DE ATRIBUTOS (TU ESTILO) */
-        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 15px; }
+        .results-header-flex {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        /* DISEÑO DEL NUEVO DESPLEGABLE DE FILTRO DE CAPAS */
+        #filter-layer-results {
+            padding: 4px;
+            font-size: 11px;
+            border: 1px solid #1e40af;
+            border-radius: 4px;
+            background: #f1f5f9;
+            color: #1e40af;
+            font-weight: bold;
+            width: 140px;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; margin-top: 5px; }
         td { border: 1px solid #ddd; padding: 6px; }
-        tr:nth-child(even) { background: #f9f9f9; }
         .attr-key { font-weight: bold; background: #f1f5f9; width: 40%; }
 
-        /* SELECTORES */
         .control-group { margin-bottom: 8px; }
         label { font-size: 11px; font-weight: bold; color: #444; }
         select { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; margin-top: 3px; }
@@ -99,25 +110,17 @@
             width: 100%; padding: 8px; background: #1e40af; color: white; border: none; 
             border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 12px;
         }
-        button:hover { background: #1e3a8a; }
 
-        .layer-row { display: flex; align-items: center; font-size: 13px; margin-bottom: 5px; cursor: pointer; }
+        .layer-row { display: flex; align-items: center; font-size: 13px; margin-bottom: 5px; }
         .layer-row input { margin-right: 8px; }
 
-        .badge-count {
-            background: #16a34a; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; float: right;
-        }
-
-        .close-results {
-            color: #ef4444; float: right; cursor: pointer; font-size: 12px;
-        }
+        .close-results { color: #ef4444; cursor: pointer; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <header>
     <span>Geovisor de Avance Catastral</span>
-    <div id="geocoder-nav"></div>
 </header>
 
 <div id="map"></div>
@@ -129,12 +132,18 @@
     </div>
 
     <div id="results-panel" class="panel">
-        <div>
-            <span class="close-results" onclick="closeResults()">✖ Cerrar</span>
-            <h3>Resultados <span id="res-count" class="badge-count">0</span></h3>
+        <div class="results-header-flex">
+            <h3>Resultados</h3>
+            <select id="filter-layer-results" onchange="filterResultsByLayer()">
+                <option value="all">Ver Todas</option>
+                <option value="TG_LOTE">Lotes</option>
+                <option value="TG_EDIFICA">Edificios</option>
+                <option value="TG_CONSTRUCCION">Construcciones</option>
+                <option value="TG_PUERTA">Puertas</option>
+            </select>
+            <span class="close-results" onclick="closeResults()">✖</span>
         </div>
-        <div id="results-content" class="scroll-area">
-            </div>
+        <div id="results-content" class="scroll-area"></div>
     </div>
 </div>
 
@@ -156,120 +165,164 @@
 </div>
 
 <script>
-    /** 1. CONFIGURACIÓN DE MAPAS BASE (TU CÓDIGO) **/
-    var map = L.map('map', {
-        maxZoom: 22,
-        minZoom: 5,
-        zoomControl: false
-    }).setView([-12.0463, -77.0427], 16);
-
+    var map = L.map('map', { maxZoom: 22, minZoom: 5, zoomControl: false }).setView([-12.0463, -77.0427], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22 });
-
     L.control.layers({"Mapa Callejero": osm, "Vista Satelital": sat}, null, {position: 'topright'}).addTo(map);
 
-    // Buscador de direcciones
-    L.Control.geocoder({ defaultMarkGeocode: true, position: 'topright' }).addTo(map);
-
-    /** 2. CONFIGURACIÓN DE CAPAS GEOJSON **/
     const config = [
         { id: 'tg_sector', name: 'Sectores', url: 'data/tg_sector.geojson', style: { color: "#6b7280", weight: 2, fill: false }, z: 10 },
         { id: 'tg_manzana', name: 'Manzanas', url: 'data/tg_manzana.geojson', style: { color: "#2563eb", weight: 2, fill: false }, z: 20 },
-        { id: 'tg_lote', name: 'Lotes', url: 'data/tg_lote.geojson', style: { color: "#16a34a", weight: 1, fillOpacity: 0.4 }, z: 30 },
-        { id: 'tg_edifica', name: 'Edificaciones', url: 'data/tg_edifica.geojson', style: { color: "#d97706", weight: 1, fillOpacity: 0.5 }, z: 40 },
-        { id: 'tg_construccion', name: 'Construcciones (Pisos)', url: 'data/tg_construccion.geojson', style: { color: "#dc2626", weight: 0.5, fillOpacity: 0.3 }, z: 50 },
+        { id: 'tg_lote', name: 'Lotes', url: 'data/tg_lote.geojson', style: { color: "#16a34a", weight: 2, fillOpacity: 0.3 }, z: 30 },
+        { id: 'tg_edifica', name: 'Edificaciones', url: 'data/tg_edifica.geojson', style: { color: "#d97706", weight: 1, fillOpacity: 0.4 }, z: 40 },
+        { id: 'tg_construccion', name: 'Construcciones (Pisos)', url: 'data/tg_construccion.geojson', style: { color: "#dc2626", weight: 0.5, fillOpacity: 0.2 }, z: 50 },
         { id: 'tg_puerta', name: 'Puertas', url: 'data/tg_puerta.geojson', isPoint: true, z: 60 }
     ];
 
     const geoLayers = {};
     let highlightedLayer = null;
+    let currentResults = []; // Almacena los resultados actuales para filtrar
 
     async function init() {
         for (const item of config) {
             try {
                 const res = await fetch(item.url);
                 const data = await res.json();
-
                 geoLayers[item.id] = L.geoJSON(data, {
                     style: item.style,
-                    pointToLayer: (f, latlng) => item.isPoint ? L.circleMarker(latlng, {radius: 3, color: "#000", fillOpacity: 1}) : null,
-                    onEachFeature: (f, l) => {
-                        l.on('click', (e) => identify(e));
-                    }
+                    pointToLayer: (f, latlng) => item.isPoint ? L.circleMarker(latlng, {radius: 4, color: "#000", fillOpacity: 1}) : null,
+                    onEachFeature: (f, l) => l.on('click', (e) => identify(e))
                 }).addTo(map);
-
                 geoLayers[item.id].setZIndex(item.z);
                 createLayerControl(item);
                 if(item.id === 'tg_sector') fillSectors(data);
-            } catch(e) { console.warn("Archivo no encontrado: " + item.url); }
+            } catch(e) {}
         }
     }
 
-    /** 3. IDENTIFICACIÓN Y PANEL DE RESULTADOS (DEBAJO DE CAPAS) **/
     function identify(e) {
         L.DomEvent.stopPropagation(e);
         const latlng = e.latlng;
-        const results = [];
+        const found = [];
 
-        // Buscar en todas las capas activas bajo el clic
         Object.keys(geoLayers).forEach(key => {
             if (map.hasLayer(geoLayers[key])) {
                 geoLayers[key].eachLayer(layer => {
                     const isInside = (layer.getBounds && layer.getBounds().contains(latlng)) || 
-                                     (layer.getLatLng && latlng.distanceTo(layer.getLatLng()) < 15);
-                    
+                                     (layer.getLatLng && latlng.distanceTo(latlng) < 0.0001); // Simplificado
                     if (isInside) {
-                        results.push({ name: key.replace('tg_','').toUpperCase(), props: layer.feature.properties, obj: layer });
+                        found.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
                     }
                 });
             }
         });
 
-        if (results.length > 0) {
-            displayResults(results);
-            highlight(results[0].obj);
+        if (found.length > 0) {
+            currentResults = found;
+            renderTable('all');
+            highlight(found[0].obj);
         }
     }
 
-    function displayResults(data) {
+    // NUEVA FUNCIÓN: RENDERIZA TABLAS SEGÚN FILTRO DEL DESPLEGABLE
+    function renderTable(filter) {
         const panel = document.getElementById('results-panel');
         const content = document.getElementById('results-content');
-        document.getElementById('res-count').innerText = data.length;
-
+        
         let html = "";
-        data.forEach(item => {
-            html += `<strong>Capa: ${item.name}</strong>`;
-            html += `<table>`;
-            for (let key in item.props) {
-                html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || ''}</td></tr>`;
-            }
-            html += `</table>`;
-        });
+        const filteredData = filter === 'all' ? currentResults : currentResults.filter(d => d.layer === filter);
+
+        if(filteredData.length === 0) {
+            html = "<p style='font-size:11px; color:red;'>No hay datos para esta capa en esta ubicación.</p>";
+        } else {
+            filteredData.forEach(item => {
+                html += `<div style="border-bottom:2px solid #1e40af; margin-top:10px; font-weight:bold; font-size:12px;">${item.layer}</div>`;
+                html += `<table>`;
+                for (let key in item.props) {
+                    html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || ''}</td></tr>`;
+                }
+                html += `</table>`;
+            });
+        }
 
         content.innerHTML = html;
         panel.style.display = 'flex';
     }
 
+    function filterResultsByLayer() {
+        const val = document.getElementById('filter-layer-results').value;
+        renderTable(val);
+    }
+
+    // BUSCADOR JERÁRQUICO MEJORADO: Busca elementos espaciales relacionados
+    selLote.onchange = () => {
+        const lotVal = selLote.value;
+        const mznaVal = selMzna.value;
+        let mainLote = null;
+
+        geoLayers['tg_lote'].eachLayer(l => {
+            if(l.feature.properties.cod_lote == lotVal && l.feature.properties.cod_mzna == mznaVal) {
+                mainLote = l;
+            }
+        });
+
+        if (mainLote) {
+            map.fitBounds(mainLote.getBounds());
+            highlight(mainLote);
+            
+            // Recopilar TODO lo que esté dentro de este lote para el desplegable de resultados
+            const spatialFound = [];
+            const bounds = mainLote.getBounds();
+
+            Object.keys(geoLayers).forEach(key => {
+                geoLayers[key].eachLayer(layer => {
+                    // Si es un polígono comprobamos si se intersecta, si es punto si está contenido
+                    if(layer.getBounds && bounds.intersects(layer.getBounds())) {
+                        spatialFound.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
+                    } else if (layer.getLatLng && bounds.contains(layer.getLatLng())) {
+                        spatialFound.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
+                    }
+                });
+            });
+
+            currentResults = spatialFound;
+            document.getElementById('filter-layer-results').value = 'all';
+            renderTable('all');
+        }
+    };
+
+    /** FUNCIONES DE APOYO **/
     function highlight(layer) {
-        if (highlightedLayer) {
-            const original = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer)).style;
-            if (highlightedLayer.setStyle) highlightedLayer.setStyle(original);
+        if (highlightedLayer && highlightedLayer.setStyle) {
+            const cfg = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer));
+            if(cfg) highlightedLayer.setStyle(cfg.style);
         }
         highlightedLayer = layer;
-        if (layer.setStyle) layer.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.6 });
+        if (layer.setStyle) layer.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.7 });
     }
 
-    function closeResults() {
+    function createLayerControl(item) {
+        const div = document.createElement('div');
+        div.className = 'layer-row';
+        div.innerHTML = `<input type="checkbox" checked> <span>${item.name}</span>`;
+        div.querySelector('input').onchange = (e) => {
+            if(e.target.checked) map.addLayer(geoLayers[item.id]);
+            else map.removeLayer(geoLayers[item.id]);
+        };
+        document.getElementById('layer-list').appendChild(div);
+    }
+
+    function closeResults() { 
         document.getElementById('results-panel').style.display = 'none';
-        if (highlightedLayer) {
-            const original = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer)).style;
-            if (highlightedLayer.setStyle) highlightedLayer.setStyle(original);
+        if (highlightedLayer && highlightedLayer.setStyle) {
+            const cfg = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer));
+            if(cfg) highlightedLayer.setStyle(cfg.style);
         }
     }
 
-    /** 4. BUSCADOR JERÁRQUICO **/
+    // Selectores Jerárquicos (Lógica estándar)
     const selSector = document.getElementById('sel-sector');
     const selMzna = document.getElementById('sel-mzna');
     const selLote = document.getElementById('sel-lote');
@@ -303,39 +356,16 @@
         }
     };
 
-    selLote.onchange = () => {
-        geoLayers['tg_lote'].eachLayer(l => {
-            if(l.feature.properties.cod_lote == selLote.value && l.feature.properties.cod_mzna == selMzna.value) {
-                map.fitBounds(l.getBounds());
-                highlight(l);
-                displayResults([{ name: 'LOTE SELECCIONADO', props: l.feature.properties, obj: l }]);
-            }
-        });
-    };
-
     function resetFilters() {
         selSector.value = "";
         selMzna.disabled = selLote.disabled = true;
         closeResults();
     }
 
-    /** 5. CONTROL DE CAPAS IZQUIERDO **/
-    function createLayerControl(item) {
-        const div = document.createElement('div');
-        div.className = 'layer-row';
-        div.innerHTML = `<input type="checkbox" checked onchange="geoLayers['${item.id}'].toggleLayer(this.checked)"> ${item.name}`;
-        div.querySelector('input').onchange = (e) => {
-            if(e.target.checked) map.addLayer(geoLayers[item.id]);
-            else map.removeLayer(geoLayers[item.id]);
-        };
-        document.getElementById('layer-list').appendChild(div);
-    }
-
-    // Iniciar carga
     init();
-
 </script>
 </body>
 </html>
+
 
 
