@@ -107,23 +107,9 @@
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // --- CAPAS BASE ---
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 }).addTo(map);
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
-    
-    // ORTOIMAGEN INTEGRADA (Configurada para evitar el blanco)
-    var ortoimagen = L.tileLayer('ortofoto/{z}/{x}/{y}.jpg', {
-        maxZoom: 20,           
-        maxNativeZoom: 18,     // Zoom real de tus teselas JPG
-        attribution: 'Ortofoto Propia'
-    });
-
-    // Control de capas actualizado
-    L.control.layers({
-        "Callejero": osm, 
-        "Satelital": sat,
-        "Ortoimagen": ortoimagen
-    }, null, {position: 'topright'}).addTo(map);
+    L.control.layers({"Callejero": osm, "Satelital": sat}, null, {position: 'topright'}).addTo(map);
 
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
@@ -138,12 +124,12 @@
     let geoLayers = {};
     let currentResultsData = [];
     let highlightLayer = L.layerGroup().addTo(map);
-    let labelLayer = L.layerGroup().addTo(map);
+    let labelLayer = L.layerGroup().addTo(map); // Capa dedicada para etiquetas
 
     async function init() {
         for (let id of layerKeys) {
             try {
-                const res = await fetch(data/${id}.geojson);
+                const res = await fetch(`data/${id}.geojson`);
                 const data = await res.json();
                 geoLayers[id] = L.geoJSON(data, {
                     style: styles[id],
@@ -161,6 +147,7 @@
                 if(id === 'tg_sector') populateSectors(data);
             } catch(e) { console.warn("Error cargando " + id); }
         }
+        // Controlar visibilidad de etiquetas según zoom
         map.on('zoomend', refreshLabels);
     }
 
@@ -188,6 +175,7 @@
                 const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
 
                 if (id === 'tg_lote') {
+                    // Muestra todos los lotes de la manzana seleccionada para contexto
                     if (isMatch) {
                         l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
                         if (isExactLote) {
@@ -210,11 +198,11 @@
             });
         }
         if (currentResultsData.length > 0) {
-            map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 21 });
+            map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 22 });
             document.getElementById('filter-layer-results').value = 'ALL';
             updateResultsUI();
             highlightBorders(currentResultsData.map(d => d.obj));
-            refreshLabels();
+            refreshLabels(); // Actualizar etiquetas tras filtrar
         }
     }
 
@@ -222,17 +210,22 @@
         labelLayer.clearLayers();
         const zoom = map.getZoom();
         const sec = sSec.value, mzn = sMzn.value;
-        if (!mzn) return;
+
+        if (!mzn) return; // Solo mostrar si hay una manzana seleccionada
+
+        // 1. ETIQUETAS DE MANZANA (Zoom > 17)
         if (zoom >= 17) {
             geoLayers['tg_manzana'].eachLayer(l => {
                 if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
                     L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-mzna', html: MZ ${l.feature.properties.cod_mzna} }),
+                        icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
                         interactive: false
                     }).addTo(labelLayer);
                 }
             });
         }
+
+        // 2. ETIQUETAS DE LOTE (Zoom > 19)
         if (zoom >= 19) {
             geoLayers['tg_lote'].eachLayer(l => {
                 const p = l.feature.properties;
@@ -251,7 +244,7 @@
         const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificaciones', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         const div = document.createElement('div');
         div.className = 'layer-row';
-        div.innerHTML = <input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>;
+        div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
             if(e.target.checked) map.addLayer(geoLayers[id]);
             else map.removeLayer(geoLayers[id]);
@@ -266,6 +259,7 @@
         const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
+
         data.sort((a, b) => {
             if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
                 return (a.props.piso || "").localeCompare(b.props.piso || "", undefined, {numeric: true});
@@ -275,21 +269,22 @@
             }
             return 0;
         });
+
         data.forEach((item) => {
             let badge = '';
-            if (item.layer === 'TG_PUERTA' && item.props.orden) badge = <span class="order-badge">Orden ${item.props.orden}</span>;
-            if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = <span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>;
+            if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
+            if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
             html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
                         <span>CAPA: ${item.layer}</span>
                         ${badge}
                      </div>`;
-            html += <table>;
+            html += `<table>`;
             for (let key in item.props) {
                 let val = item.props[key];
-                if (key.toLowerCase() === 'fid') val = <span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>;
-                html += <tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>;
+                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
+                html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
             }
-            html += </table>;
+            html += `</table>`;
         });
         content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
         panel.style.display = 'flex';
@@ -320,7 +315,7 @@
 
     function populateSectors(data) {
         const items = [...new Set(data.features.map(f => f.properties.cod_sector))].sort();
-        items.forEach(i => sSec.innerHTML += <option value="${i}">${i}</option>);
+        items.forEach(i => sSec.innerHTML += `<option value="${i}">${i}</option>`);
     }
 
     function updateManzanas(callback) {
@@ -330,7 +325,7 @@
         if(sSec.value) {
             let list = [];
             geoLayers['tg_manzana'].eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value) list.push(l.feature.properties.cod_mzna); });
-            [...new Set(list)].sort().forEach(m => sMzn.innerHTML += <option value="${m}">${m}</option>);
+            [...new Set(list)].sort().forEach(m => sMzn.innerHTML += `<option value="${m}">${m}</option>`);
         }
         if(callback) callback();
     }
@@ -341,7 +336,7 @@
         if(sMzn.value) {
             let list = [];
             geoLayers['tg_lote'].eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value && l.feature.properties.cod_mzna == sMzn.value) list.push(l.feature.properties.cod_lote); });
-            [...new Set(list)].sort().forEach(lo => sLot.innerHTML += <option value="${lo}">${lo}</option>);
+            [...new Set(list)].sort().forEach(lo => sLot.innerHTML += `<option value="${lo}">${lo}</option>`);
         }
         if(callback) callback();
     }
