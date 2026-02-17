@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Geovisor de Avance Catastral</title>
+<title>Geovisor Catastral</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -10,7 +10,6 @@
 
 <style>
 body { margin:0; font-family: Arial; }
-
 header{
   background:#1e40af;
   color:white;
@@ -18,15 +17,33 @@ header{
   font-size:20px;
   font-weight:bold;
 }
-
 #map { height: calc(100vh - 65px); }
+
+/* PANEL BUSQUEDA */
+#searchPanel{
+  position:absolute;
+  top:80px;
+  right:10px;
+  width:260px;
+  background:white;
+  padding:12px;
+  border-radius:8px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.4);
+  z-index:1000;
+  font-size:13px;
+}
+select,button{
+  width:100%;
+  padding:5px;
+  margin-bottom:6px;
+}
 
 /* PANEL CAPAS */
 #layerPanel{
   position:absolute;
   top:80px;
   left:10px;
-  width:220px;
+  width:200px;
   background:white;
   padding:10px;
   border-radius:8px;
@@ -35,62 +52,14 @@ header{
   font-size:13px;
 }
 
-/* PANEL FILTROS */
-#filterPanel{
-  position:absolute;
-  top:80px;
-  right:10px;
-  width:300px;
-  background:white;
-  padding:10px;
-  border-radius:8px;
-  box-shadow:0 3px 10px rgba(0,0,0,0.4);
-  z-index:1000;
-  font-size:13px;
-  max-height:80vh;
-  overflow:auto;
-}
-
-.grupo{
-  margin-bottom:10px;
-  border-bottom:1px solid #ddd;
-}
-
-.grupo h4{
-  margin:5px 0;
-  cursor:pointer;
-  background:#2563eb;
-  color:white;
-  padding:5px;
-  border-radius:4px;
-  font-size:13px;
-}
-
-.contenido{ display:none; margin-top:5px; }
-
-input{
-  width:100%;
-  margin-bottom:5px;
-  padding:4px;
-}
-
-button{
-  width:100%;
-  background:#2563eb;
-  color:white;
-  border:none;
-  padding:5px;
-  cursor:pointer;
-}
-
-/* PANEL ATRIBUTOS */
+/* PANEL INFO */
 #infoPanel{
   position:absolute;
   bottom:10px;
   left:50%;
   transform:translateX(-50%);
-  width:500px;
-  max-height:250px;
+  width:520px;
+  max-height:260px;
   overflow:auto;
   background:white;
   border-radius:8px;
@@ -99,32 +68,34 @@ button{
   display:none;
   font-size:12px;
 }
-
 #infoHeader{
   background:#f3f4f6;
-  padding:8px;
+  padding:6px;
   font-weight:bold;
   display:flex;
   justify-content:space-between;
 }
-
-#closeBtn{ cursor:pointer; color:red; }
-
-table{
-  width:100%;
-  border-collapse:collapse;
-}
-
-td{
-  border:1px solid #ddd;
-  padding:4px;
+#closeBtn{cursor:pointer;color:red;}
+table{width:100%;border-collapse:collapse;}
+td{border:1px solid #ddd;padding:4px;}
+.highlight{
+  color:#eab308;
 }
 </style>
 </head>
 <body>
 
-<header>Geovisor de Avance Catastral</header>
+<header>Geovisor Catastral</header>
 <div id="map"></div>
+
+<!-- PANEL BUSQUEDA -->
+<div id="searchPanel">
+<b>Buscar Lote</b><br><br>
+<select id="sel_sector"></select>
+<select id="sel_manzana"></select>
+<select id="sel_lote"></select>
+<button onclick="buscarLote()">Buscar</button>
+</div>
 
 <!-- PANEL CAPAS -->
 <div id="layerPanel">
@@ -137,50 +108,7 @@ td{
 <label><input type="checkbox" id="chk_puerta" checked> tg_puerta</label>
 </div>
 
-<!-- PANEL FILTROS -->
-<div id="filterPanel">
-<b>Filtros</b><br><br>
-
-<div class="grupo">
-<h4 onclick="toggle(this)">LT - tg_lote</h4>
-<div class="contenido">
-<input id="f_lote_mzn" placeholder="cod_mzna">
-<input id="f_lote_cod" placeholder="cod_lote">
-<button onclick="filtrar('lote')">Filtrar</button>
-</div>
-</div>
-
-<div class="grupo">
-<h4 onclick="toggle(this)">tg_edifica</h4>
-<div class="contenido">
-<input id="f_edi_mzn" placeholder="cod_mzna">
-<input id="f_edi_cod" placeholder="cod_lote">
-<button onclick="filtrar('edifica')">Filtrar</button>
-</div>
-</div>
-
-<div class="grupo">
-<h4 onclick="toggle(this)">tg_construccion</h4>
-<div class="contenido">
-<input id="f_con_mzn" placeholder="cod_mzna">
-<input id="f_con_cod" placeholder="cod_lote">
-<input id="f_con_piso" placeholder="cod_piso">
-<button onclick="filtrar('construccion')">Filtrar</button>
-</div>
-</div>
-
-<div class="grupo">
-<h4 onclick="toggle(this)">tg_puerta</h4>
-<div class="contenido">
-<input id="f_pue_mzn" placeholder="cod_mzna">
-<input id="f_pue_cod" placeholder="cod_lote">
-<button onclick="filtrar('puerta')">Filtrar</button>
-</div>
-</div>
-
-</div>
-
-<!-- PANEL ATRIBUTOS -->
+<!-- PANEL INFO -->
 <div id="infoPanel">
 <div id="infoHeader">
 <span id="infoTitle"></span>
@@ -198,62 +126,45 @@ L.tileLayer(
 {maxZoom:22}
 ).addTo(map);
 
-// -------- FUNCION ATRIBUTOS --------
-function mostrarAtributos(props, nombreCapa){
-document.getElementById("infoTitle").innerText = nombreCapa;
-var html="<table>";
-for(var k in props){
+// -------- FUNCION INFO --------
+function mostrarInfo(lista, nombreCapa){
+document.getElementById("infoTitle").innerText =
+nombreCapa + " (" + lista.length + " registros)";
+let html="";
+lista.forEach((props,i)=>{
+html+="<hr><b>Registro "+(i+1)+"</b><table>";
+for(let k in props){
 html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
 }
 html+="</table>";
-document.getElementById("infoContent").innerHTML = html;
+});
+document.getElementById("infoContent").innerHTML=html;
 document.getElementById("infoPanel").style.display="block";
 }
 document.getElementById("closeBtn").onclick=function(){
 document.getElementById("infoPanel").style.display="none";
 };
 
-// -------- FUNCION FILTRO --------
-function aplicarFiltro(layer, campoValores){
-layer.clearLayers();
-L.geoJSON(layer.originalData,{
-style: layer.options.style,
-pointToLayer: layer.options.pointToLayer,
-onEachFeature:(f,l)=>{
-let cumple=true;
-for(let campo in campoValores){
-if(campoValores[campo] &&
-f.properties[campo]!=campoValores[campo]) cumple=false;
-}
-if(cumple){
-l.on("click",()=>mostrarAtributos(f.properties, layer.nombre));
-layer.addLayer(l);
-}
-}
-});
-}
-
-// -------- CARGA CAPAS --------
+// -------- CARGA GENERICA --------
 function cargar(url, estilo, nombre, tipo="polygon"){
 return fetch(url)
 .then(r=>r.json())
 .then(data=>{
 var layer=L.geoJSON(data,{
-style: estilo,
+style:estilo,
 pointToLayer: tipo==="point"
 ? (f,latlng)=>L.circleMarker(latlng,estilo)
-: undefined,
-onEachFeature:(f,l)=>{
-l.on("click",()=>mostrarAtributos(f.properties,nombre));
-}
+: undefined
 });
 layer.originalData=data;
 layer.nombre=nombre;
+layer.estiloOriginal=estilo;
 return layer;
 });
 }
 
-var sectorLayer,manzanaLayer,loteLayer,edificaLayer,construccionLayer,puertaLayer;
+var sectorLayer,manzanaLayer,loteLayer,
+edificaLayer,construccionLayer,puertaLayer;
 
 Promise.all([
 cargar('data/tg_sector.geojson',{color:"#6b7280",weight:2,fill:false},"tg_sector"),
@@ -261,7 +172,7 @@ cargar('data/tg_manzana.geojson',{color:"#2563eb",weight:1,fill:false},"tg_manza
 cargar('data/tg_lote.geojson',{color:"#16a34a",weight:1,fillOpacity:0.4},"tg_lote"),
 cargar('data/tg_edifica.geojson',{color:"#f59e0b",weight:1,fillOpacity:0.5},"tg_edifica"),
 cargar('data/tg_construccion.geojson',{color:"#ef4444",weight:1,fillOpacity:0.6},"tg_construccion"),
-cargar('data/tg_puerta.geojson',{radius:3,color:"#000"},"tg_puerta","point")
+cargar('data/tg_puerta.geojson',{radius:4,color:"#000"},"tg_puerta","point")
 ]).then(function(layers){
 
 sectorLayer=layers[0].addTo(map);
@@ -278,46 +189,84 @@ edificaLayer.bringToFront();
 construccionLayer.bringToFront();
 puertaLayer.bringToFront();
 
+llenarSelects();
 });
 
-// -------- FILTRAR --------
-function filtrar(tipo){
+// -------- BUSQUEDA JERARQUICA --------
+function llenarSelects(){
+let sectores=new Set();
+loteLayer.originalData.features.forEach(f=>{
+sectores.add(f.properties.cod_sector);
+});
+sel_sector.innerHTML="<option>Sector</option>";
+sectores.forEach(s=>sel_sector.innerHTML+="<option>"+s+"</option>");
+}
 
-if(tipo==="lote"){
-aplicarFiltro(loteLayer,{
-cod_mzna:f_lote_mzn.value,
-cod_lote:f_lote_cod.value
+sel_sector.onchange=function(){
+let manzanas=new Set();
+loteLayer.originalData.features.forEach(f=>{
+if(f.properties.cod_sector==this.value)
+manzanas.add(f.properties.cod_mzna);
+});
+sel_manzana.innerHTML="<option>Manzana</option>";
+manzanas.forEach(m=>sel_manzana.innerHTML+="<option>"+m+"</option>");
+};
+
+sel_manzana.onchange=function(){
+let lotes=new Set();
+loteLayer.originalData.features.forEach(f=>{
+if(f.properties.cod_mzna==this.value)
+lotes.add(f.properties.cod_lote);
+});
+sel_lote.innerHTML="<option>Lote</option>";
+lotes.forEach(l=>sel_lote.innerHTML+="<option>"+l+"</option>");
+};
+
+function buscarLote(){
+let encontrados=[];
+loteLayer.eachLayer(function(layer){
+if(layer.feature.properties.cod_lote==sel_lote.value){
+encontrados.push(layer.feature.properties);
+map.fitBounds(layer.getBounds());
+layer.setStyle({color:"yellow"});
+}
+});
+if(encontrados.length>0)
+mostrarInfo(encontrados,"tg_lote");
+}
+
+// -------- CLICK MULTICAPA --------
+map.on("click",function(e){
+let encontrados=[];
+let capas=[construccionLayer,edificaLayer,loteLayer];
+capas.forEach(capa=>{
+if(map.hasLayer(capa)){
+capa.eachLayer(function(layer){
+if(layer.getBounds && layer.getBounds().contains(e.latlng)){
+layer.setStyle && layer.setStyle({color:"yellow"});
+encontrados.push(layer.feature.properties);
+}
 });
 }
-
-if(tipo==="edifica"){
-aplicarFiltro(edificaLayer,{
-cod_mzna:f_edi_mzn.value,
-cod_lote:f_edi_cod.value
 });
-}
-
-if(tipo==="construccion"){
-aplicarFiltro(construccionLayer,{
-cod_mzna:f_con_mzn.value,
-cod_lote:f_con_cod.value,
-cod_piso:f_con_piso.value
+if(encontrados.length>0)
+mostrarInfo(encontrados,"Elementos seleccionados");
 });
-}
 
-if(tipo==="puerta"){
-aplicarFiltro(puertaLayer,{
-cod_mzna:f_pue_mzn.value,
-cod_lote:f_pue_cod.value
-});
+// -------- TOGGLE CAPAS --------
+function toggle(id,layer){
+document.getElementById(id).onchange=function(){
+this.checked?map.addLayer(layer):map.removeLayer(layer);
+};
 }
-}
-
-// -------- TOGGLE --------
-function toggle(el){
-let c=el.nextElementSibling;
-c.style.display=c.style.display==="block"?"none":"block";
-}
+setTimeout(()=>{
+toggle("chk_sector",sectorLayer);
+toggle("chk_manzana",manzanaLayer);
+toggle("chk_lote",loteLayer);
+toggle("chk_edifica",edificaLayer);
+toggle("chk_construccion",construccionLayer);
+toggle("chk_puerta",puertaLayer);
+},1000);
 
 </script>
 </body>
