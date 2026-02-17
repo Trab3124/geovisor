@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Alta Precisión</title>
+    <title>Geovisor Catastral Pro - Gestión Municipal</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -17,7 +17,6 @@
         }
         #map { height: calc(100vh - 55px); width: 100%; background: #e5e7eb; }
 
-        /* Paneles */
         .sidebar-left {
             position: absolute; top: 65px; left: 10px; width: 340px; z-index: 1000;
             display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 80px);
@@ -29,19 +28,16 @@
 
         #search-panel { position: absolute; right: 10px; top: 65px; width: 280px; z-index: 1000; }
 
-        /* UI de Tablas y Resultados */
         h3 { margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .results-header-flex { display: flex; align-items: center; justify-content: space-between; }
         
-        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; border: 1px solid #cbd5e1; }
         td { border: 1px solid #e2e8f0; padding: 6px; }
         .attr-key { font-weight: bold; background: #f8fafc; color: #475569; width: 35%; }
         
-        /* FID Clickeable */
         .fid-link { color: #2563eb; text-decoration: underline; cursor: pointer; font-weight: bold; }
-        .fid-link:hover { color: #1d4ed8; background: #dbeafe; }
+        .order-badge { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; }
 
-        /* Controles */
         select { width: 100%; padding: 7px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; margin-top: 4px; }
         label { font-size: 11px; font-weight: bold; color: #64748b; }
         .btn-reset { width: 100%; padding: 8px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; font-weight: bold; }
@@ -52,7 +48,7 @@
 </head>
 <body>
 
-<header>Geovisor de Avance Catastral - Alta Resolución</header>
+<header>Geovisor de Avance Catastral</header>
 <div id="map"></div>
 
 <div class="sidebar-left">
@@ -90,45 +86,31 @@
         <label>Lote</label>
         <select id="sel-lote" disabled><option value="">Seleccione...</option></select>
     </div>
-    <button class="btn-reset" onclick="resetFilters()">Limpiar Filtro Visual</button>
+    <button class="btn-reset" onclick="resetFilters()">Limpiar Filtros</button>
 </div>
 
 <script>
-    // 1. CONFIGURACIÓN DE MAPA CON ZOOM ULTRA-ALTO (Nivel 24)
-    var map = L.map('map', { 
-        zoomControl: false,
-        maxZoom: 24, // Permite zoom extremo
-        wheelDebounceTime: 50
-    }).setView([-12.046, -77.042], 16);
-
+    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Mapas base con maxNativeZoom para evitar que desaparezcan al acercarse
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 24, maxNativeZoom: 19
-    }).addTo(map);
-    
-    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 24, maxNativeZoom: 19
-    });
-
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 }).addTo(map);
+    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
     L.control.layers({"Callejero": osm, "Satelital": sat}, null, {position: 'topright'}).addTo(map);
 
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
-        'tg_sector': { color: "#475569", weight: 3, fill: false },
-        'tg_manzana': { color: "#2563eb", weight: 2, fill: false },
-        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2 },
-        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4 },
-        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3 },
-        'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1 }
+        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1 },
+        'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1 },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1 },
+        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1 },
+        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1 },
+        'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1 }
     };
 
     let geoLayers = {};
     let currentResultsData = [];
     let highlightLayer = L.layerGroup().addTo(map);
 
-    // 2. CARGA DE DATOS
     async function init() {
         for (let id of layerKeys) {
             try {
@@ -143,15 +125,15 @@
                 }).addTo(map);
                 addLayerCheckbox(id);
                 if(id === 'tg_sector') populateSectors(data);
-            } catch(e) { console.warn("Falta archivo: " + id); }
+            } catch(e) {}
         }
     }
 
     function addLayerCheckbox(id) {
         const list = document.getElementById('layer-list');
+        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificaciones', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         const div = document.createElement('div');
         div.className = 'layer-row';
-        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificaciones', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
             if(e.target.checked) map.addLayer(geoLayers[id]);
@@ -160,7 +142,6 @@
         list.appendChild(div);
     }
 
-    // 3. IDENTIFICAR POR CLIC
     function identifyClick(latlng) {
         let found = [];
         for (let id in geoLayers) {
@@ -175,27 +156,35 @@
         if (found.length > 0) {
             currentResultsData = found;
             updateResultsUI();
-            highlightObjects(found.map(f => f.obj));
+            highlightBorders(found.map(f => f.obj));
         }
     }
 
-    // 4. ACTUALIZAR PANEL DE RESULTADOS Y FID CLICKEABLE
     function updateResultsUI() {
         const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
 
-        data.forEach((item, index) => {
-            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af;">CAPA: ${item.layer}</div>`;
+        // MEJORA: ORDENAR PUERTAS SI SE SELECCIONAN
+        if (filter === 'TG_PUERTA' || (filter === 'ALL' && data.some(d => d.layer === 'TG_PUERTA'))) {
+            data.sort((a, b) => {
+                if(a.layer !== 'TG_PUERTA' || b.layer !== 'TG_PUERTA') return 0;
+                return parseInt(a.props.orden || 0) - parseInt(b.props.orden || 0);
+            });
+        }
+
+        data.forEach((item) => {
+            const isPuerta = item.layer === 'TG_PUERTA';
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between;">
+                        <span>CAPA: ${item.layer}</span>
+                        ${isPuerta && item.props.orden ? `<span class="order-badge">Orden ${item.props.orden}</span>` : ''}
+                     </div>`;
             html += `<table>`;
             for (let key in item.props) {
-                let value = item.props[key];
-                // Hacer el FID clickeable
-                if (key.toLowerCase() === 'fid') {
-                    value = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${value}')">${value}</span>`;
-                }
-                html += `<tr><td class="attr-key">${key}</td><td>${value || '-'}</td></tr>`;
+                let val = item.props[key];
+                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
+                html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
             }
             html += `</table>`;
         });
@@ -203,28 +192,36 @@
         document.getElementById('results-panel').style.display = 'flex';
     }
 
-    // ZOOM ESPECÍFICO POR FID
     function zoomToFid(layerId, fidValue) {
         geoLayers[layerId].eachLayer(l => {
             if (l.feature.properties.fid == fidValue) {
                 if (l.getBounds) map.fitBounds(l.getBounds(), { maxZoom: 22 });
                 else map.setView(l.getLatLng(), 22);
-                highlightObjects([l]);
+                highlightBorders([l]);
             }
         });
     }
 
-    function highlightObjects(objs) {
+    // MEJORA: SOLO RESALTAR BORDES
+    function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
+            const isPoint = o.feature.geometry.type === "Point";
             const clone = L.geoJSON(o.feature, {
-                style: { color: 'yellow', weight: 5, fillOpacity: 0.6, radius: 8 }
+                style: { 
+                    color: 'yellow', 
+                    weight: 6, 
+                    fillOpacity: 0, // No pintar el interior
+                    opacity: 1,
+                    radius: 8 
+                },
+                pointToLayer: (f, latlng) => L.circleMarker(latlng)
             });
             highlightLayer.addLayer(clone);
         });
     }
 
-    // 5. BUSCADOR JERÁRQUICO CON FILTRO VISUAL (OCULTAR LO NO SELECCIONADO)
+    // BUSCADOR CON PERSISTENCIA DE LOTE
     const sSec = document.getElementById('sel-sector'), sMzn = document.getElementById('sel-mzna'), sLot = document.getElementById('sel-lote');
 
     function populateSectors(data) {
@@ -233,8 +230,7 @@
     }
 
     sSec.onchange = () => {
-        sMzn.innerHTML = '<option value="">Seleccione...</option>';
-        sLot.innerHTML = '<option value="">Seleccione...</option>';
+        sMzn.innerHTML = '<option value="">Seleccione...</option>'; sLot.innerHTML = '<option value="">Seleccione...</option>';
         sMzn.disabled = !sSec.value;
         if(sSec.value) {
             let list = [];
@@ -258,30 +254,37 @@
         if(!lot) return;
 
         currentResultsData = [];
-        let bounds = L.latLngBounds();
+        let zoomBounds = L.latLngBounds();
 
-        // MEJORA: FILTRO VISUAL (Ocultar y mostrar según códigos)
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => {
                 const p = l.feature.properties;
                 const isMatch = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
 
-                if (isMatch) {
-                    l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity || 0.4 });
-                    currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
-                    if (l.getBounds) bounds.extend(l.getBounds());
-                    else bounds.extend(l.getLatLng());
+                // MEJORA: tg_lote nunca se oculta, lo demás sí
+                if (id === 'tg_lote') {
+                    l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity }); // Siempre visible
+                    if (isMatch) {
+                        currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
+                        zoomBounds.extend(l.getBounds());
+                    }
                 } else {
-                    // Ocultar visualmente lo que no coincide
-                    l.setStyle({ opacity: 0, fillOpacity: 0 });
+                    if (isMatch) {
+                        l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
+                        currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
+                        if (l.getBounds) zoomBounds.extend(l.getBounds());
+                        else zoomBounds.extend(l.getLatLng());
+                    } else {
+                        l.setStyle({ opacity: 0, fillOpacity: 0 }); // Ocultar resto
+                    }
                 }
             });
         }
 
         if (currentResultsData.length > 0) {
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 22 });
+            map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 22 });
             updateResultsUI();
-            highlightObjects(currentResultsData.map(d => d.obj));
+            highlightBorders(currentResultsData.map(d => d.obj));
         }
     };
 
@@ -289,11 +292,9 @@
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
         document.getElementById('results-panel').style.display = 'none';
         highlightLayer.clearLayers();
-        // Restaurar visibilidad de todas las capas
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => l.setStyle(styles[id]));
         }
-        map.setView([-12.046, -77.042], 16);
     }
 
     init();
