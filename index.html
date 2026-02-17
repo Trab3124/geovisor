@@ -2,13 +2,11 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor de Avance Catastral - Profesional</title>
+    <title>Geovisor de Avance Catastral - Municipalidad</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
     <style>
         body { margin:0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4; overflow: hidden; }
@@ -22,24 +20,24 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 65px;
+            height: 60px;
             box-sizing: border-box;
             z-index: 1001;
             position: relative;
         }
 
-        #map { height: calc(100vh - 65px); width: 100%; }
+        #map { height: calc(100vh - 60px); width: 100%; }
 
         .sidebar-left {
             position: absolute;
-            top: 80px;
+            top: 75px;
             left: 10px;
-            width: 320px;
+            width: 330px;
             z-index: 1000;
             display: flex;
             flex-direction: column;
             gap: 10px;
-            max-height: calc(100vh - 100px);
+            max-height: calc(100vh - 90px);
         }
 
         .panel {
@@ -47,46 +45,38 @@
             border-radius: 8px;
             padding: 15px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-            overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
         #results-panel {
             display: none;
-            max-height: 500px;
+            max-height: 450px;
+            border-top: 4px solid #1e40af;
         }
 
         .scroll-area {
             overflow-y: auto;
             margin-top: 10px;
-            border-top: 1px solid #eee;
         }
 
         #search-panel {
             position: absolute;
             right: 10px;
-            top: 80px;
+            top: 75px;
             width: 280px;
             z-index: 1000;
         }
 
-        h3 { 
-            margin: 0 0 10px 0; 
-            font-size: 14px; 
-            color: #1e40af; 
-            text-transform: uppercase;
-        }
+        h3 { margin: 0 0 10px 0; font-size: 14px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
 
         .results-header-flex {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 5px;
-            margin-bottom: 10px;
         }
 
-        /* DISEÑO DEL NUEVO DESPLEGABLE DE FILTRO DE CAPAS */
         #filter-layer-results {
             padding: 4px;
             font-size: 11px;
@@ -95,33 +85,37 @@
             background: #f1f5f9;
             color: #1e40af;
             font-weight: bold;
-            width: 140px;
         }
 
-        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; margin-top: 5px; }
-        td { border: 1px solid #ddd; padding: 6px; }
-        .attr-key { font-weight: bold; background: #f1f5f9; width: 40%; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 10px; }
+        td { border: 1px solid #ddd; padding: 6px; word-break: break-all; }
+        .attr-key { font-weight: bold; background: #f8fafc; width: 40%; color: #334155; }
 
         .control-group { margin-bottom: 8px; }
         label { font-size: 11px; font-weight: bold; color: #444; }
-        select { width: 100%; padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; margin-top: 3px; }
+        select { width: 100%; padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 12px; margin-top: 3px; }
         
         button {
             width: 100%; padding: 8px; background: #1e40af; color: white; border: none; 
-            border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 12px;
+            border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold;
         }
 
-        .layer-row { display: flex; align-items: center; font-size: 13px; margin-bottom: 5px; }
-        .layer-row input { margin-right: 8px; }
+        .layer-row { display: flex; align-items: center; font-size: 13px; margin-bottom: 6px; }
+        .layer-row input { margin-right: 10px; cursor: pointer; }
 
-        .close-results { color: #ef4444; cursor: pointer; font-size: 14px; font-weight: bold; }
+        .close-results { color: #ef4444; cursor: pointer; font-size: 16px; font-weight: bold; }
+        
+        /* Estilo para destacar selección */
+        .selected-feature {
+            stroke: #ffff00;
+            stroke-width: 5;
+            fill-opacity: 0.8;
+        }
     </style>
 </head>
 <body>
 
-<header>
-    <span>Geovisor de Avance Catastral</span>
-</header>
+<header>Geovisor de Avance Catastral</header>
 
 <div id="map"></div>
 
@@ -133,15 +127,15 @@
 
     <div id="results-panel" class="panel">
         <div class="results-header-flex">
-            <h3>Resultados</h3>
-            <select id="filter-layer-results" onchange="filterResultsByLayer()">
-                <option value="all">Ver Todas</option>
+            <h3 style="margin:0">Resultados</h3>
+            <select id="filter-layer-results" onchange="updateResultsUI()">
+                <option value="ALL">Ver Todas</option>
                 <option value="TG_LOTE">Lotes</option>
                 <option value="TG_EDIFICA">Edificios</option>
                 <option value="TG_CONSTRUCCION">Construcciones</option>
                 <option value="TG_PUERTA">Puertas</option>
             </select>
-            <span class="close-results" onclick="closeResults()">✖</span>
+            <span class="close-results" onclick="closeResults()">&times;</span>
         </div>
         <div id="results-content" class="scroll-area"></div>
     </div>
@@ -161,208 +155,222 @@
         <label>Lote</label>
         <select id="sel-lote" disabled><option value="">Seleccione Lote...</option></select>
     </div>
-    <button onclick="resetFilters()" style="background:#6b7280">Limpiar Filtros</button>
+    <button onclick="resetFilters()" style="background:#64748b">Limpiar Filtros</button>
 </div>
 
 <script>
-    var map = L.map('map', { maxZoom: 22, minZoom: 5, zoomControl: false }).setView([-12.0463, -77.0427], 16);
+    // 1. Inicializar Mapa
+    var map = L.map('map', { zoomControl: false }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 22 }).addTo(map);
-    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 22 });
-    L.control.layers({"Mapa Callejero": osm, "Vista Satelital": sat}, null, {position: 'topright'}).addTo(map);
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}');
+    L.control.layers({"Callejero": osm, "Satelital": sat}, null, {position: 'topright'}).addTo(map);
 
-    const config = [
-        { id: 'tg_sector', name: 'Sectores', url: 'data/tg_sector.geojson', style: { color: "#6b7280", weight: 2, fill: false }, z: 10 },
-        { id: 'tg_manzana', name: 'Manzanas', url: 'data/tg_manzana.geojson', style: { color: "#2563eb", weight: 2, fill: false }, z: 20 },
-        { id: 'tg_lote', name: 'Lotes', url: 'data/tg_lote.geojson', style: { color: "#16a34a", weight: 2, fillOpacity: 0.3 }, z: 30 },
-        { id: 'tg_edifica', name: 'Edificaciones', url: 'data/tg_edifica.geojson', style: { color: "#d97706", weight: 1, fillOpacity: 0.4 }, z: 40 },
-        { id: 'tg_construccion', name: 'Construcciones (Pisos)', url: 'data/tg_construccion.geojson', style: { color: "#dc2626", weight: 0.5, fillOpacity: 0.2 }, z: 50 },
-        { id: 'tg_puerta', name: 'Puertas', url: 'data/tg_puerta.geojson', isPoint: true, z: 60 }
-    ];
+    // 2. Variables de Capas
+    const layerNames = {
+        'tg_sector': 'Sectores',
+        'tg_manzana': 'Manzanas',
+        'tg_lote': 'Lotes',
+        'tg_edifica': 'Edificaciones',
+        'tg_construccion': 'Construcciones',
+        'tg_puerta': 'Puertas'
+    };
 
-    const geoLayers = {};
+    const styles = {
+        'tg_sector': { color: "#64748b", weight: 3, fill: false },
+        'tg_manzana': { color: "#2563eb", weight: 2, fill: false },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.3 },
+        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4 },
+        'tg_construccion': { color: "#dc2626", weight: 1, fillOpacity: 0.4 },
+        'tg_puerta': { radius: 4, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1 }
+    };
+
+    let geoLayers = {};
+    let currentResultsData = []; 
     let highlightedLayer = null;
-    let currentResults = []; // Almacena los resultados actuales para filtrar
 
-    async function init() {
-        for (const item of config) {
+    // 3. Carga de Capas
+    async function loadData() {
+        for (let key in layerNames) {
             try {
-                const res = await fetch(item.url);
-                const data = await res.json();
-                geoLayers[item.id] = L.geoJSON(data, {
-                    style: item.style,
-                    pointToLayer: (f, latlng) => item.isPoint ? L.circleMarker(latlng, {radius: 4, color: "#000", fillOpacity: 1}) : null,
-                    onEachFeature: (f, l) => l.on('click', (e) => identify(e))
+                const response = await fetch(`data/${key}.geojson`);
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+
+                geoLayers[key] = L.geoJSON(data, {
+                    style: styles[key],
+                    pointToLayer: (feature, latlng) => key === 'tg_puerta' ? L.circleMarker(latlng, styles[key]) : null,
+                    onEachFeature: (feature, layer) => {
+                        layer.on('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            processClick(e.latlng);
+                        });
+                    }
                 }).addTo(map);
-                geoLayers[item.id].setZIndex(item.z);
-                createLayerControl(item);
-                if(item.id === 'tg_sector') fillSectors(data);
-            } catch(e) {}
+
+                // Crear Checkbox
+                addLayerCheckbox(key);
+                
+                // Llenar Buscador si es Sector
+                if (key === 'tg_sector') populateSectors(data);
+
+            } catch (err) {
+                console.warn(`No se pudo cargar: ${key}.geojson`);
+            }
         }
     }
 
-    function identify(e) {
-        L.DomEvent.stopPropagation(e);
-        const latlng = e.latlng;
-        const found = [];
+    function addLayerCheckbox(key) {
+        const list = document.getElementById('layer-list');
+        const div = document.createElement('div');
+        div.className = 'layer-row';
+        div.innerHTML = `<input type="checkbox" checked id="chk-${key}"> <label for="chk-${key}">${layerNames[key]}</label>`;
+        div.querySelector('input').onclick = (e) => {
+            if (e.target.checked) map.addLayer(geoLayers[key]);
+            else map.removeLayer(geoLayers[key]);
+        };
+        list.appendChild(div);
+    }
 
-        Object.keys(geoLayers).forEach(key => {
+    // 4. Lógica de Identificación y Resultados
+    function processClick(latlng) {
+        let found = [];
+        for (let key in geoLayers) {
             if (map.hasLayer(geoLayers[key])) {
                 geoLayers[key].eachLayer(layer => {
-                    const isInside = (layer.getBounds && layer.getBounds().contains(latlng)) || 
-                                     (layer.getLatLng && latlng.distanceTo(latlng) < 0.0001); // Simplificado
-                    if (isInside) {
+                    let isMatch = false;
+                    if (layer.getBounds && layer.getBounds().contains(latlng)) isMatch = true;
+                    else if (layer.getLatLng && latlng.distanceTo(layer.getLatLng()) < 10) isMatch = true;
+
+                    if (isMatch) {
                         found.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
                     }
                 });
             }
-        });
-
+        }
         if (found.length > 0) {
-            currentResults = found;
-            renderTable('all');
+            currentResultsData = found;
+            updateResultsUI();
             highlight(found[0].obj);
         }
     }
 
-    // NUEVA FUNCIÓN: RENDERIZA TABLAS SEGÚN FILTRO DEL DESPLEGABLE
-    function renderTable(filter) {
-        const panel = document.getElementById('results-panel');
+    function updateResultsUI() {
+        const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
+        const panel = document.getElementById('results-panel');
         
         let html = "";
-        const filteredData = filter === 'all' ? currentResults : currentResults.filter(d => d.layer === filter);
+        let dataToDisplay = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
 
-        if(filteredData.length === 0) {
-            html = "<p style='font-size:11px; color:red;'>No hay datos para esta capa en esta ubicación.</p>";
+        if (dataToDisplay.length === 0) {
+            html = "<p style='font-size:12px; color:gray; text-align:center;'>Sin datos para esta capa.</p>";
         } else {
-            filteredData.forEach(item => {
-                html += `<div style="border-bottom:2px solid #1e40af; margin-top:10px; font-weight:bold; font-size:12px;">${item.layer}</div>`;
+            dataToDisplay.forEach(item => {
+                html += `<div style="background:#1e40af; color:white; padding:4px 8px; font-size:11px; margin-top:10px;">CAPA: ${item.layer}</div>`;
                 html += `<table>`;
-                for (let key in item.props) {
-                    html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || ''}</td></tr>`;
+                for (let p in item.props) {
+                    html += `<tr><td class="attr-key">${p}</td><td>${item.props[p] || '-'}</td></tr>`;
                 }
                 html += `</table>`;
             });
         }
-
         content.innerHTML = html;
         panel.style.display = 'flex';
     }
 
-    function filterResultsByLayer() {
-        const val = document.getElementById('filter-layer-results').value;
-        renderTable(val);
+    function highlight(layer) {
+        if (highlightedLayer) {
+            geoLayers[highlightedLayer.key].resetStyle(highlightedLayer.layer);
+        }
+        // Encontrar a qué capa pertenece para resetear luego
+        let parentKey = Object.keys(geoLayers).find(k => geoLayers[k].hasLayer(layer));
+        highlightedLayer = { layer: layer, key: parentKey };
+
+        if (layer.setStyle) {
+            layer.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.7 });
+            layer.bringToFront();
+        }
     }
 
-    // BUSCADOR JERÁRQUICO MEJORADO: Busca elementos espaciales relacionados
-    selLote.onchange = () => {
-        const lotVal = selLote.value;
-        const mznaVal = selMzna.value;
-        let mainLote = null;
+    function closeResults() {
+        document.getElementById('results-panel').style.display = 'none';
+        if (highlightedLayer) {
+            geoLayers[highlightedLayer.key].resetStyle(highlightedLayer.layer);
+            highlightedLayer = null;
+        }
+    }
 
+    // 5. Buscador Jerárquico
+    const sSec = document.getElementById('sel-sector');
+    const sMzn = document.getElementById('sel-mzna');
+    const sLot = document.getElementById('sel-lote');
+
+    function populateSectors(data) {
+        const secs = [...new Set(data.features.map(f => f.properties.cod_sector))].sort();
+        secs.forEach(s => sSec.innerHTML += `<option value="${s}">${s}</option>`);
+    }
+
+    sSec.onchange = () => {
+        sMzn.innerHTML = '<option value="">Seleccione Manzana...</option>';
+        sLot.innerHTML = '<option value="">Seleccione Lote...</option>';
+        sMzn.disabled = !sSec.value; sLot.disabled = true;
+
+        if (sSec.value && geoLayers['tg_manzana']) {
+            let mzns = [];
+            geoLayers['tg_manzana'].eachLayer(l => {
+                if (l.feature.properties.cod_sector == sSec.value) mzns.push(l.feature.properties.cod_mzna);
+            });
+            [...new Set(mzns)].sort().forEach(m => sMzn.innerHTML += `<option value="${m}">${m}</option>`);
+        }
+    };
+
+    sMzn.onchange = () => {
+        sLot.innerHTML = '<option value="">Seleccione Lote...</option>';
+        sLot.disabled = !sMzn.value;
+
+        if (sMzn.value && geoLayers['tg_lote']) {
+            let lots = [];
+            geoLayers['tg_lote'].eachLayer(l => {
+                if (l.feature.properties.cod_mzna == sMzn.value) lots.push(l.feature.properties.cod_lote);
+            });
+            [...new Set(lots)].sort().forEach(lt => sLot.innerHTML += `<option value="${lt}">${lt}</option>`);
+        }
+    };
+
+    sLot.onchange = () => {
+        if (!sLot.value) return;
+        let target = null;
         geoLayers['tg_lote'].eachLayer(l => {
-            if(l.feature.properties.cod_lote == lotVal && l.feature.properties.cod_mzna == mznaVal) {
-                mainLote = l;
-            }
+            if (l.feature.properties.cod_lote == sLot.value && l.feature.properties.cod_mzna == sMzn.value) target = l;
         });
 
-        if (mainLote) {
-            map.fitBounds(mainLote.getBounds());
-            highlight(mainLote);
+        if (target) {
+            map.fitBounds(target.getBounds());
+            // Relacionar espacialmente:
+            currentResultsData = [];
+            const bbox = target.getBounds();
             
-            // Recopilar TODO lo que esté dentro de este lote para el desplegable de resultados
-            const spatialFound = [];
-            const bounds = mainLote.getBounds();
-
-            Object.keys(geoLayers).forEach(key => {
-                geoLayers[key].eachLayer(layer => {
-                    // Si es un polígono comprobamos si se intersecta, si es punto si está contenido
-                    if(layer.getBounds && bounds.intersects(layer.getBounds())) {
-                        spatialFound.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
-                    } else if (layer.getLatLng && bounds.contains(layer.getLatLng())) {
-                        spatialFound.push({ layer: key.toUpperCase(), props: layer.feature.properties, obj: layer });
+            // Buscar en todas las capas lo que esté dentro de ese lote
+            for (let key in geoLayers) {
+                geoLayers[key].eachLayer(l => {
+                    if ((l.getBounds && bbox.intersects(l.getBounds())) || (l.getLatLng && bbox.contains(l.getLatLng()))) {
+                        currentResultsData.push({ layer: key.toUpperCase(), props: l.feature.properties, obj: l });
                     }
                 });
-            });
-
-            currentResults = spatialFound;
-            document.getElementById('filter-layer-results').value = 'all';
-            renderTable('all');
-        }
-    };
-
-    /** FUNCIONES DE APOYO **/
-    function highlight(layer) {
-        if (highlightedLayer && highlightedLayer.setStyle) {
-            const cfg = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer));
-            if(cfg) highlightedLayer.setStyle(cfg.style);
-        }
-        highlightedLayer = layer;
-        if (layer.setStyle) layer.setStyle({ color: 'yellow', weight: 4, fillOpacity: 0.7 });
-    }
-
-    function createLayerControl(item) {
-        const div = document.createElement('div');
-        div.className = 'layer-row';
-        div.innerHTML = `<input type="checkbox" checked> <span>${item.name}</span>`;
-        div.querySelector('input').onchange = (e) => {
-            if(e.target.checked) map.addLayer(geoLayers[item.id]);
-            else map.removeLayer(geoLayers[item.id]);
-        };
-        document.getElementById('layer-list').appendChild(div);
-    }
-
-    function closeResults() { 
-        document.getElementById('results-panel').style.display = 'none';
-        if (highlightedLayer && highlightedLayer.setStyle) {
-            const cfg = config.find(c => geoLayers[c.id].hasLayer(highlightedLayer));
-            if(cfg) highlightedLayer.setStyle(cfg.style);
-        }
-    }
-
-    // Selectores Jerárquicos (Lógica estándar)
-    const selSector = document.getElementById('sel-sector');
-    const selMzna = document.getElementById('sel-mzna');
-    const selLote = document.getElementById('sel-lote');
-
-    function fillSectors(data) {
-        const items = [...new Set(data.features.map(f => f.properties.cod_sector))].sort();
-        items.forEach(i => selSector.innerHTML += `<option value="${i}">${i}</option>`);
-    }
-
-    selSector.onchange = () => {
-        selMzna.innerHTML = '<option value="">Seleccione Manzana...</option>';
-        selMzna.disabled = !selSector.value;
-        if(selSector.value) {
-            const mznas = [];
-            geoLayers['tg_manzana'].eachLayer(l => {
-                if(l.feature.properties.cod_sector == selSector.value) mznas.push(l.feature.properties.cod_mzna);
-            });
-            [...new Set(mznas)].sort().forEach(m => selMzna.innerHTML += `<option value="${m}">${m}</option>`);
-        }
-    };
-
-    selMzna.onchange = () => {
-        selLote.innerHTML = '<option value="">Seleccione Lote...</option>';
-        selLote.disabled = !selMzna.value;
-        if(selMzna.value) {
-            const lotes = [];
-            geoLayers['tg_lote'].eachLayer(l => {
-                if(l.feature.properties.cod_mzna == selMzna.value) lotes.push(l.feature.properties.cod_lote);
-            });
-            [...new Set(lotes)].sort().forEach(lo => selLote.innerHTML += `<option value="${lo}">${lo}</option>`);
+            }
+            highlight(target);
+            updateResultsUI();
         }
     };
 
     function resetFilters() {
-        selSector.value = "";
-        selMzna.disabled = selLote.disabled = true;
+        sSec.value = ""; sMzn.disabled = sLot.disabled = true;
         closeResults();
     }
 
-    init();
+    loadData();
 </script>
 </body>
 </html>
