@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral - Ortoimagen Final</title>
+    <title>Geovisor Catastral - Ortofoto JPG</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -55,6 +55,7 @@
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
             background: none; border: none; box-shadow: none;
         }
+        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -85,7 +86,6 @@
 
 <div id="search-panel" class="panel">
     <h3>Búsqueda Jerárquica</h3>
-    <p style="font-size: 10px; color: #1e40af; margin-top: -5px;">* Haz clic en un lote para filtrar</p>
     <div style="margin-bottom:8px">
         <label>Sector</label>
         <select id="sel-sector"><option value="">Seleccione...</option></select>
@@ -102,37 +102,35 @@
 </div>
 
 <script>
-    // 1. CONFIGURACIÓN INICIAL DEL MAPA
-    // He puesto el zoom inicial en 12 para que coincida con tus primeras teselas
-    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 12);
+    // 1. CONFIGURACIÓN DEL MAPA
+    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     // 2. CAPAS BASE
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 });
-
-    // CARGA DE TU ORTOFOTO (Asegúrate que la carpeta 'ortofoto' esté en la misma ruta que este index.html)
-    var ortofotoLocal = L.tileLayer('ortofoto/{z}/{x}/{y}.png', {
+    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
+    
+    // ORTOFOTO CONFIGURADA COMO JPG
+    var ortofoto = L.tileLayer('ortofoto/{z}/{x}/{y}.jpg', {
         maxZoom: 24,
         maxNativeZoom: 20, 
-        attribution: 'Ortofoto Municipal'
-    }).addTo(map); // La añadimos por defecto
+        minZoom: 12,
+        attribution: 'Ortofoto Propia'
+    }).addTo(map);
 
-    var satEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
-
-    // Control de Capas Base
     var baseMaps = {
-        "Ortofoto Propia": ortofotoLocal,
-        "Mapa Callejero": osm,
-        "Satélite ESRI": satEsri
+        "Mi Ortofoto": ortofoto,
+        "Satélite ESRI": sat,
+        "Mapa Callejero": osm
     };
-    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+    L.control.layers(baseMaps, null, {position: 'topright', collapsed: false}).addTo(map);
 
-    // 3. CAPAS VECTORIALES
+    // 3. LÓGICA VECTORIAL (GEOJSON)
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
         'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
         'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1, interactive: false },
-        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.1, opacity: 1, interactive: true },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
         'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
         'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1, interactive: false }
@@ -167,24 +165,21 @@
         map.on('zoomend', refreshLabels);
     }
 
-    // --- Lógica de etiquetas y filtrado ---
-
     function refreshLabels() {
         labelLayer.clearLayers();
         const zoom = map.getZoom();
         const sec = sSec.value, mzn = sMzn.value;
-        if (!mzn) return;
+        if (!mzn || zoom < 17) return;
 
-        if (zoom >= 17) {
-            geoLayers['tg_manzana'].eachLayer(l => {
-                if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
-                    L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
-                        interactive: false
-                    }).addTo(labelLayer);
-                }
-            });
-        }
+        geoLayers['tg_manzana'].eachLayer(l => {
+            if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
+                L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
+                    interactive: false
+                }).addTo(labelLayer);
+            }
+        });
+
         if (zoom >= 19) {
             geoLayers['tg_lote'].eachLayer(l => {
                 const p = l.feature.properties;
@@ -218,27 +213,24 @@
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => {
                 const p = l.feature.properties;
-                const isMatch = (p.cod_sector == sec && p.cod_mzna == mzn && (id === 'tg_lote' ? true : p.cod_lote == lot));
                 const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
+                const isMznaMatch = (p.cod_sector == sec && p.cod_mzna == mzn);
 
                 if (id === 'tg_lote') {
-                    if (isMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
+                    if (isMznaMatch) {
+                        l.setStyle({ opacity: 1, fillOpacity: 0.2 });
                         if (isExactLote) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
                         }
-                    } else {
-                        l.setStyle({ opacity: 0, fillOpacity: 0 });
-                    }
+                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
                 } else {
                     if (isExactLote) {
                         l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
-                    } else {
-                        l.setStyle({ opacity: 0, fillOpacity: 0 });
-                    }
+                        else zoomBounds.extend(l.getLatLng());
+                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
                 }
             });
         }
@@ -259,7 +251,6 @@
         div.querySelector('input').onchange = (e) => {
             if(e.target.checked) map.addLayer(geoLayers[id]);
             else map.removeLayer(geoLayers[id]);
-            refreshLabels();
         };
         list.appendChild(div);
     }
@@ -323,10 +314,10 @@
     function resetFilters() {
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
         document.getElementById('results-panel').style.display = 'none';
-        labelLayer.clearLayers();
         highlightLayer.clearLayers();
+        labelLayer.clearLayers();
         for (let id in geoLayers) { geoLayers[id].eachLayer(l => l.setStyle(styles[id])); }
-        map.setView([-12.046, -77.042], 12);
+        map.setView([-12.046, -77.042], 16);
     }
 
     init();
