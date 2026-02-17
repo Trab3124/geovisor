@@ -5,18 +5,16 @@
 <title>Geovisor de Avance Catastral</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<!-- Geocoder -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <style>
-body { margin:0; font-family: Arial, sans-serif; }
+body { margin:0; font-family: Arial; }
 
-header {
+header{
   background:#1e40af;
   color:white;
   padding:14px 20px;
@@ -26,198 +24,218 @@ header {
 
 #map { height: calc(100vh - 65px); }
 
-/* Panel de atributos */
-#panelAtributos {
+.panel{
   position:absolute;
-  top:80px;
   right:10px;
-  width:300px;
+  top:80px;
+  width:320px;
+  background:white;
+  border-radius:8px;
+  padding:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
   max-height:400px;
   overflow:auto;
-  background:white;
-  padding:12px;
-  border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.3);
   display:none;
   z-index:1000;
 }
 
-#panelAtributos h3 {
-  margin-top:0;
+.filtro{
+  position:absolute;
+  left:10px;
+  top:80px;
+  width:250px;
+  background:white;
+  border-radius:8px;
+  padding:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+  z-index:1000;
 }
 
-table {
+select, button{
   width:100%;
-  border-collapse:collapse;
-  font-size:12px;
+  margin-top:5px;
+  padding:5px;
 }
 
-td {
-  border:1px solid #ddd;
-  padding:4px;
-}
-
-.closeBtn {
-  cursor:pointer;
-  color:red;
-  float:right;
-  font-weight:bold;
+.leaflet-tooltip{
+  background:white;
+  border:1px solid #333;
+  font-size:11px;
+  padding:2px;
 }
 </style>
 </head>
 <body>
 
-<header>
-Geovisor de Avance Catastral
-</header>
+<header>Geovisor de Avance Catastral</header>
 
 <div id="map"></div>
 
-<div id="panelAtributos">
-  <span class="closeBtn" onclick="cerrarPanel()">X</span>
-  <h3>Atributos</h3>
-  <div id="contenidoAtributos"></div>
+<div class="panel" id="panelAtributos">
+  <div style="text-align:right">
+    <button onclick="anterior()">Anterior</button>
+    <button onclick="siguiente()">Siguiente</button>
+    <button onclick="cerrarPanel()">X</button>
+  </div>
+  <div id="contenido"></div>
+</div>
+
+<div class="filtro">
+  <b>Filtro</b>
+  <select id="fSector"></select>
+  <select id="fManzana"></select>
+  <select id="fLote"></select>
+  <button onclick="aplicarFiltro()">Aplicar</button>
+  <button onclick="limpiarFiltro()">Limpiar</button>
 </div>
 
 <script>
 
-// ===========================
-// MAPA
-// ===========================
+var map = L.map('map',{maxZoom:22,minZoom:5}).setView([-11.99,-77.05],15);
 
-var map = L.map('map', {
-  maxZoom: 22,
-  minZoom: 5
-}).setView([-11.99, -77.05], 15);
+var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
 
-// Base OSM
-var osm = L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  { maxZoom:22 }
-).addTo(map);
-
-// Satelital ESRI
-var satelite = L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom:22 }
+var sat = L.tileLayer(
+'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+{maxZoom:22}
 );
 
-L.control.layers(
-  {"OpenStreetMap": osm, "Satelital": satelite},
-  null,
-  {collapsed:false}
-).addTo(map);
-
-
-// ===========================
-// BUSCADOR
-// ===========================
+L.control.layers({"OSM":osm,"Satelital":sat}).addTo(map);
 
 L.Control.geocoder({
-  defaultMarkGeocode:true,
-  placeholder:"Buscar dirección o lugar..."
+ defaultMarkGeocode:true,
+ placeholder:"Buscar dirección o lugar..."
 }).addTo(map);
 
+var todasCapas = [];
+var resultadosClick = [];
+var indiceActual = 0;
 
-// ===========================
-// PANEL ATRIBUTOS
-// ===========================
+// PANEL
+function mostrarPanel(){
+ if(resultadosClick.length==0) return;
+ var props = resultadosClick[indiceActual].feature.properties;
+ var html="<table>";
+ for(var k in props){
+   html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
+ }
+ html+="</table>";
+ document.getElementById("contenido").innerHTML=html;
+ document.getElementById("panelAtributos").style.display="block";
+}
 
-function mostrarAtributos(propiedades){
+function siguiente(){
+ if(indiceActual<resultadosClick.length-1){
+   indiceActual++;
+   mostrarPanel();
+ }
+}
 
-  var contenido = "<table>";
-
-  for(var key in propiedades){
-    contenido += "<tr><td><b>"+key+"</b></td><td>"+propiedades[key]+"</td></tr>";
-  }
-
-  contenido += "</table>";
-
-  document.getElementById("contenidoAtributos").innerHTML = contenido;
-  document.getElementById("panelAtributos").style.display = "block";
+function anterior(){
+ if(indiceActual>0){
+   indiceActual--;
+   mostrarPanel();
+ }
 }
 
 function cerrarPanel(){
-  document.getElementById("panelAtributos").style.display = "none";
+ document.getElementById("panelAtributos").style.display="none";
 }
 
+// CLICK MULTICAPA
+map.on("click",function(e){
+ resultadosClick=[];
+ indiceActual=0;
+ todasCapas.forEach(function(layer){
+   layer.eachLayer(function(l){
+     if(l.getBounds && l.getBounds().contains(e.latlng)){
+       resultadosClick.push(l);
+     }
+   });
+ });
+ mostrarPanel();
+});
 
-// ===========================
-// FUNCIÓN PARA CARGAR CAPAS
-// ===========================
-
+// CARGAR CAPAS
 function cargarPoligono(url, estilo){
-
-  fetch(url)
-  .then(res => res.json())
-  .then(data => {
-
-    L.geoJSON(data,{
-      style: estilo,
-      onEachFeature: function(feature, layer){
-        layer.on("click", function(){
-          mostrarAtributos(feature.properties);
-        });
-      }
-    }).addTo(map);
-
-  });
-
+ fetch(url).then(r=>r.json()).then(data=>{
+   var layer=L.geoJSON(data,{
+     style:estilo,
+     onEachFeature:function(f,l){
+       l.bindTooltip("",{permanent:false});
+     }
+   }).addTo(map);
+   todasCapas.push(layer);
+ });
 }
 
 function cargarPuntos(url){
-
-  fetch(url)
-  .then(res => res.json())
-  .then(data => {
-
-    L.geoJSON(data,{
-      pointToLayer: function(feature, latlng){
-        return L.circleMarker(latlng,{
-          radius:3,
-          color:"#000",
-          fillColor:"#000",
-          fillOpacity:0.9
-        });
-      },
-      onEachFeature: function(feature, layer){
-        layer.on("click", function(){
-          mostrarAtributos(feature.properties);
-        });
-      }
-    }).addTo(map);
-
-  });
-
+ fetch(url).then(r=>r.json()).then(data=>{
+   var layer=L.geoJSON(data,{
+     pointToLayer:function(f,latlng){
+       return L.circleMarker(latlng,{
+         radius:3,color:"#000",fillColor:"#000",fillOpacity:0.9
+       });
+     }
+   }).addTo(map);
+   todasCapas.push(layer);
+ });
 }
 
-
-// ===========================
-// CARGAR TUS CAPAS
-// ===========================
-
-cargarPoligono('data/tg_sector.geojson',
-  {color:"#6b7280", weight:2, fill:false});
-
-cargarPoligono('data/tg_manzana.geojson',
-  {color:"#2563eb", weight:2, fill:false});
-
-cargarPoligono('data/tg_lote.geojson',
-  {color:"#16a34a", weight:1, fillOpacity:0.4});
-
-cargarPoligono('data/tg_edifica.geojson',
-  {color:"#f97316", weight:1});
-
-cargarPoligono('data/tg_construccion.geojson',
-  {color:"#dc2626", weight:1});
-
-cargarPoligono('data/tg_construccion_2.geojson',
-  {color:"#9333ea", weight:1});
-
+// Cargar
+cargarPoligono('data/tg_sector.geojson',{color:"#6b7280",weight:2,fill:false});
+cargarPoligono('data/tg_manzana.geojson',{color:"#2563eb",weight:2,fill:false});
+cargarPoligono('data/tg_lote.geojson',{color:"#16a34a",weight:1,fillOpacity:0.4});
+cargarPoligono('data/tg_edifica.geojson',{color:"#f97316",weight:1});
+cargarPoligono('data/tg_construccion.geojson',{color:"#dc2626",weight:1});
+cargarPoligono('data/tg_construccion_2.geojson',{color:"#9333ea",weight:1});
 cargarPuntos('data/tg_puerta.geojson');
+cargarPoligono('data/uca.geojson',{color:"#0891b2",weight:1});
 
-cargarPoligono('data/uca.geojson',
-  {color:"#0891b2", weight:1});
+// FILTRO
+function aplicarFiltro(){
+ var s=document.getElementById("fSector").value;
+ var m=document.getElementById("fManzana").value;
+ var l=document.getElementById("fLote").value;
+
+ todasCapas.forEach(function(layer){
+   layer.eachLayer(function(f){
+     var p=f.feature.properties;
+     var visible=true;
+     if(s && p.cod_sector!=s) visible=false;
+     if(m && p.cod_mzna!=m) visible=false;
+     if(l && p.cod_lote!=l) visible=false;
+     if(visible){ f.addTo(map); }
+     else{ map.removeLayer(f); }
+   });
+ });
+}
+
+function limpiarFiltro(){
+ location.reload();
+}
+
+// ETIQUETAS SEGÚN ZOOM
+map.on("zoomend",function(){
+ var z=map.getZoom();
+ todasCapas.forEach(function(layer){
+   layer.eachLayer(function(l){
+     var p=l.feature.properties;
+     if(z<=14 && p.cod_sector){
+       l.bindTooltip(p.cod_sector,{permanent:true});
+     }
+     else if(z>14 && z<=17 && p.cod_mzna){
+       l.bindTooltip(p.cod_mzna,{permanent:true});
+     }
+     else if(z>17 && p.cod_lote){
+       l.bindTooltip(p.cod_mzna+"-"+p.cod_lote,{permanent:true});
+     }
+     else{
+       l.unbindTooltip();
+     }
+   });
+ });
+});
 
 </script>
 </body>
