@@ -17,6 +17,7 @@
         }
         #map { height: calc(100vh - 55px); width: 100%; background: #e5e7eb; }
 
+        /* Paneles Izquierda */
         .sidebar-left {
             position: absolute; top: 65px; left: 10px; width: 340px; z-index: 1000;
             display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 80px);
@@ -26,24 +27,27 @@
         #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; }
         .scroll-area { overflow-y: auto; flex-grow: 1; margin-top: 10px; }
 
+        /* Panel Derecha */
         #search-panel { position: absolute; right: 10px; top: 65px; width: 280px; z-index: 1000; }
 
         h3 { margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .results-header-flex { display: flex; align-items: center; justify-content: space-between; }
+        .results-header-flex { display: flex; align-items: center; justify-content: space-between; gap:5px; }
         
+        /* Tablas */
         table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; border: 1px solid #cbd5e1; }
         td { border: 1px solid #e2e8f0; padding: 6px; }
         .attr-key { font-weight: bold; background: #f8fafc; color: #475569; width: 35%; }
         
+        /* Interactividad */
         .fid-link { color: #2563eb; text-decoration: underline; cursor: pointer; font-weight: bold; }
-        .order-badge { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px; }
+        .order-badge { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
 
         select { width: 100%; padding: 7px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; margin-top: 4px; }
         label { font-size: 11px; font-weight: bold; color: #64748b; }
         .btn-reset { width: 100%; padding: 8px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; font-weight: bold; }
         
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
-        .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; }
+        .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -90,6 +94,7 @@
 </div>
 
 <script>
+    // 1. CONFIGURACIÓN DEL MAPA
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -111,6 +116,7 @@
     let currentResultsData = [];
     let highlightLayer = L.layerGroup().addTo(map);
 
+    // 2. CARGA DE ARCHIVOS GEOJSON
     async function init() {
         for (let id of layerKeys) {
             try {
@@ -125,7 +131,7 @@
                 }).addTo(map);
                 addLayerCheckbox(id);
                 if(id === 'tg_sector') populateSectors(data);
-            } catch(e) {}
+            } catch(e) { console.warn("Error al cargar " + id); }
         }
     }
 
@@ -142,6 +148,7 @@
         list.appendChild(div);
     }
 
+    // 3. IDENTIFICACIÓN POR CLIC
     function identifyClick(latlng) {
         let found = [];
         for (let id in geoLayers) {
@@ -160,25 +167,35 @@
         }
     }
 
+    // 4. ACTUALIZACIÓN DE RESULTADOS CON ORDENAMIENTO POR PISO Y ORDEN
     function updateResultsUI() {
         const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
 
-        // MEJORA: ORDENAR PUERTAS SI SE SELECCIONAN
-        if (filter === 'TG_PUERTA' || (filter === 'ALL' && data.some(d => d.layer === 'TG_PUERTA'))) {
-            data.sort((a, b) => {
-                if(a.layer !== 'TG_PUERTA' || b.layer !== 'TG_PUERTA') return 0;
+        // ORDENAMIENTO LÓGICO
+        data.sort((a, b) => {
+            if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
+                return a.props.piso.localeCompare(b.props.piso, undefined, {numeric: true});
+            }
+            if (a.layer === 'TG_PUERTA' && b.layer === 'TG_PUERTA') {
                 return parseInt(a.props.orden || 0) - parseInt(b.props.orden || 0);
-            });
-        }
+            }
+            return 0;
+        });
 
         data.forEach((item) => {
             const isPuerta = item.layer === 'TG_PUERTA';
-            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between;">
+            const isConstruccion = item.layer === 'TG_CONSTRUCCION';
+            
+            let badge = '';
+            if (isPuerta && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
+            if (isConstruccion && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
                         <span>CAPA: ${item.layer}</span>
-                        ${isPuerta && item.props.orden ? `<span class="order-badge">Orden ${item.props.orden}</span>` : ''}
+                        ${badge}
                      </div>`;
             html += `<table>`;
             for (let key in item.props) {
@@ -202,26 +219,18 @@
         });
     }
 
-    // MEJORA: SOLO RESALTAR BORDES
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
-            const isPoint = o.feature.geometry.type === "Point";
             const clone = L.geoJSON(o.feature, {
-                style: { 
-                    color: 'yellow', 
-                    weight: 6, 
-                    fillOpacity: 0, // No pintar el interior
-                    opacity: 1,
-                    radius: 8 
-                },
+                style: { color: 'yellow', weight: 6, fillOpacity: 0, opacity: 1, radius: 8 },
                 pointToLayer: (f, latlng) => L.circleMarker(latlng)
             });
             highlightLayer.addLayer(clone);
         });
     }
 
-    // BUSCADOR CON PERSISTENCIA DE LOTE
+    // 5. BUSCADOR JERÁRQUICO
     const sSec = document.getElementById('sel-sector'), sMzn = document.getElementById('sel-mzna'), sLot = document.getElementById('sel-lote');
 
     function populateSectors(data) {
@@ -252,7 +261,6 @@
     sLot.onchange = () => {
         const sec = sSec.value, mzn = sMzn.value, lot = sLot.value;
         if(!lot) return;
-
         currentResultsData = [];
         let zoomBounds = L.latLngBounds();
 
@@ -261,9 +269,9 @@
                 const p = l.feature.properties;
                 const isMatch = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
 
-                // MEJORA: tg_lote nunca se oculta, lo demás sí
+                // Lógica de filtro visual: TG_LOTE siempre visible
                 if (id === 'tg_lote') {
-                    l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity }); // Siempre visible
+                    l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
                     if (isMatch) {
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         zoomBounds.extend(l.getBounds());
@@ -275,12 +283,11 @@
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
                         else zoomBounds.extend(l.getLatLng());
                     } else {
-                        l.setStyle({ opacity: 0, fillOpacity: 0 }); // Ocultar resto
+                        l.setStyle({ opacity: 0, fillOpacity: 0 });
                     }
                 }
             });
         }
-
         if (currentResultsData.length > 0) {
             map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 22 });
             updateResultsUI();
@@ -295,10 +302,10 @@
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => l.setStyle(styles[id]));
         }
+        map.setView([-12.046, -77.042], 16);
     }
 
     init();
 </script>
 </body>
 </html>
-
