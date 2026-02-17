@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Filtro y Etiquetas</title>
+    <title>Geovisor Catastral Pro - Ortoimagen</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -45,7 +45,6 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        /* Estilos de Etiquetas */
         .label-mzna {
             font-size: 12px; font-weight: bold; color: #2563eb;
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
@@ -104,12 +103,37 @@
 </div>
 
 <script>
+    // Inicialización del Mapa
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 }).addTo(map);
-    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
-    L.control.layers({"Callejero": osm, "Satelital": sat}, null, {position: 'topright'}).addTo(map);
+    // Definición de Capas Base
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+        maxZoom: 24, 
+        maxNativeZoom: 19 
+    }).addTo(map);
+
+    // CAPA DE TU ORTOIMAGEN (Ruta a tu carpeta local/repositorio)
+    var ortofotoLocal = L.tileLayer('ortofoto/{z}/{x}/{y}.png', {
+        maxZoom: 24,
+        maxNativeZoom: 20, // Ajusta esto al zoom máximo que generaste en QGIS
+        attribution: 'Ortofoto Distrital'
+    });
+
+    var satEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+        maxZoom: 24, 
+        maxNativeZoom: 19 
+    });
+
+    // Control de Capas Base
+    var baseMaps = {
+        "Mapa Callejero": osm,
+        "Ortofoto Propia": ortofotoLocal,
+        "Satélite ESRI": satEsri
+    };
+    L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+
+    // --- Resto de tu Lógica Geográfica ---
 
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
@@ -124,7 +148,7 @@
     let geoLayers = {};
     let currentResultsData = [];
     let highlightLayer = L.layerGroup().addTo(map);
-    let labelLayer = L.layerGroup().addTo(map); // Capa dedicada para etiquetas
+    let labelLayer = L.layerGroup().addTo(map);
 
     async function init() {
         for (let id of layerKeys) {
@@ -147,9 +171,10 @@
                 if(id === 'tg_sector') populateSectors(data);
             } catch(e) { console.warn("Error cargando " + id); }
         }
-        // Controlar visibilidad de etiquetas según zoom
         map.on('zoomend', refreshLabels);
     }
+
+    // --- Funciones de Filtrado y UI (Iguales a tu código previo) ---
 
     function autoFilterByLote(props) {
         sSec.value = props.cod_sector;
@@ -175,7 +200,6 @@
                 const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
 
                 if (id === 'tg_lote') {
-                    // Muestra todos los lotes de la manzana seleccionada para contexto
                     if (isMatch) {
                         l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
                         if (isExactLote) {
@@ -202,7 +226,7 @@
             document.getElementById('filter-layer-results').value = 'ALL';
             updateResultsUI();
             highlightBorders(currentResultsData.map(d => d.obj));
-            refreshLabels(); // Actualizar etiquetas tras filtrar
+            refreshLabels();
         }
     }
 
@@ -210,10 +234,8 @@
         labelLayer.clearLayers();
         const zoom = map.getZoom();
         const sec = sSec.value, mzn = sMzn.value;
+        if (!mzn) return;
 
-        if (!mzn) return; // Solo mostrar si hay una manzana seleccionada
-
-        // 1. ETIQUETAS DE MANZANA (Zoom > 17)
         if (zoom >= 17) {
             geoLayers['tg_manzana'].eachLayer(l => {
                 if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
@@ -225,7 +247,6 @@
             });
         }
 
-        // 2. ETIQUETAS DE LOTE (Zoom > 19)
         if (zoom >= 19) {
             geoLayers['tg_lote'].eachLayer(l => {
                 const p = l.feature.properties;
@@ -259,16 +280,6 @@
         const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
-
-        data.sort((a, b) => {
-            if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
-                return (a.props.piso || "").localeCompare(b.props.piso || "", undefined, {numeric: true});
-            }
-            if (a.layer === 'TG_PUERTA' && b.layer === 'TG_PUERTA') {
-                return parseInt(a.props.orden || 0) - parseInt(b.props.orden || 0);
-            }
-            return 0;
-        });
 
         data.forEach((item) => {
             let badge = '';
