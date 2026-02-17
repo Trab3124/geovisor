@@ -21,41 +21,6 @@ header{
 
 #map { height: calc(100vh - 65px); }
 
-/* PANEL ATRIBUTOS SUPERIOR DERECHO */
-#infoPanel{
-  position:absolute;
-  top:80px;
-  right:10px;
-  width:320px;
-  background:white;
-  border-radius:8px;
-  box-shadow:0 3px 10px rgba(0,0,0,0.4);
-  z-index:1000;
-  display:none;
-}
-
-#infoHeader{
-  background:#f3f4f6;
-  padding:8px;
-  font-weight:bold;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-}
-
-#infoContent{
-  padding:10px;
-  max-height:350px;
-  overflow:auto;
-  font-size:12px;
-}
-
-#closeBtn{
-  cursor:pointer;
-  color:red;
-  font-weight:bold;
-}
-
 /* PANEL CAPAS */
 #layerPanel{
   position:absolute;
@@ -69,6 +34,81 @@ header{
   z-index:1000;
   font-size:13px;
 }
+
+/* PANEL FILTROS */
+#filterPanel{
+  position:absolute;
+  top:80px;
+  right:10px;
+  width:300px;
+  background:white;
+  padding:10px;
+  border-radius:8px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.4);
+  z-index:1000;
+  font-size:13px;
+  max-height:80vh;
+  overflow:auto;
+}
+
+.grupo{
+  margin-bottom:10px;
+  border-bottom:1px solid #ddd;
+}
+
+.grupo h4{
+  margin:5px 0;
+  cursor:pointer;
+  background:#2563eb;
+  color:white;
+  padding:5px;
+  border-radius:4px;
+  font-size:13px;
+}
+
+.contenido{ display:none; margin-top:5px; }
+
+input{
+  width:100%;
+  margin-bottom:5px;
+  padding:4px;
+}
+
+button{
+  width:100%;
+  background:#2563eb;
+  color:white;
+  border:none;
+  padding:5px;
+  cursor:pointer;
+}
+
+/* PANEL ATRIBUTOS */
+#infoPanel{
+  position:absolute;
+  bottom:10px;
+  left:50%;
+  transform:translateX(-50%);
+  width:500px;
+  max-height:250px;
+  overflow:auto;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.4);
+  z-index:1000;
+  display:none;
+  font-size:12px;
+}
+
+#infoHeader{
+  background:#f3f4f6;
+  padding:8px;
+  font-weight:bold;
+  display:flex;
+  justify-content:space-between;
+}
+
+#closeBtn{ cursor:pointer; color:red; }
 
 table{
   width:100%;
@@ -84,143 +124,200 @@ td{
 <body>
 
 <header>Geovisor de Avance Catastral</header>
-
 <div id="map"></div>
 
 <!-- PANEL CAPAS -->
 <div id="layerPanel">
-  <b>Capas</b><br><br>
-  <label><input type="checkbox" id="chk_sector" checked> tg_sector</label><br>
-  <label><input type="checkbox" id="chk_manzana" checked> tg_manzana</label><br>
-  <label><input type="checkbox" id="chk_lote" checked> tg_lote</label><br>
-  <label><input type="checkbox" id="chk_edifica" checked> tg_edifica</label><br>
-  <label><input type="checkbox" id="chk_construccion" checked> tg_construccion</label><br>
-  <label><input type="checkbox" id="chk_puerta" checked> tg_puerta</label>
+<b>Capas</b><br><br>
+<label><input type="checkbox" id="chk_sector" checked> tg_sector</label><br>
+<label><input type="checkbox" id="chk_manzana" checked> tg_manzana</label><br>
+<label><input type="checkbox" id="chk_lote" checked> tg_lote</label><br>
+<label><input type="checkbox" id="chk_edifica" checked> tg_edifica</label><br>
+<label><input type="checkbox" id="chk_construccion" checked> tg_construccion</label><br>
+<label><input type="checkbox" id="chk_puerta" checked> tg_puerta</label>
 </div>
 
-<!-- PANEL INFORMACIÓN -->
+<!-- PANEL FILTROS -->
+<div id="filterPanel">
+<b>Filtros</b><br><br>
+
+<div class="grupo">
+<h4 onclick="toggle(this)">LT - tg_lote</h4>
+<div class="contenido">
+<input id="f_lote_mzn" placeholder="cod_mzna">
+<input id="f_lote_cod" placeholder="cod_lote">
+<button onclick="filtrar('lote')">Filtrar</button>
+</div>
+</div>
+
+<div class="grupo">
+<h4 onclick="toggle(this)">tg_edifica</h4>
+<div class="contenido">
+<input id="f_edi_mzn" placeholder="cod_mzna">
+<input id="f_edi_cod" placeholder="cod_lote">
+<button onclick="filtrar('edifica')">Filtrar</button>
+</div>
+</div>
+
+<div class="grupo">
+<h4 onclick="toggle(this)">tg_construccion</h4>
+<div class="contenido">
+<input id="f_con_mzn" placeholder="cod_mzna">
+<input id="f_con_cod" placeholder="cod_lote">
+<input id="f_con_piso" placeholder="cod_piso">
+<button onclick="filtrar('construccion')">Filtrar</button>
+</div>
+</div>
+
+<div class="grupo">
+<h4 onclick="toggle(this)">tg_puerta</h4>
+<div class="contenido">
+<input id="f_pue_mzn" placeholder="cod_mzna">
+<input id="f_pue_cod" placeholder="cod_lote">
+<button onclick="filtrar('puerta')">Filtrar</button>
+</div>
+</div>
+
+</div>
+
+<!-- PANEL ATRIBUTOS -->
 <div id="infoPanel">
-  <div id="infoHeader">
-    <span id="infoTitle">Capa</span>
-    <span id="closeBtn">X</span>
-  </div>
-  <div id="infoContent"></div>
+<div id="infoHeader">
+<span id="infoTitle"></span>
+<span id="closeBtn">X</span>
+</div>
+<div id="infoContent"></div>
 </div>
 
 <script>
 
-var map = L.map('map',{maxZoom:22,minZoom:5})
-.setView([-11.99,-77.05],15);
+var map = L.map('map').setView([-11.99,-77.05],15);
 
 L.tileLayer(
 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 {maxZoom:22}
 ).addTo(map);
 
-// -------- FUNCION MOSTRAR ATRIBUTOS --------
+// -------- FUNCION ATRIBUTOS --------
 function mostrarAtributos(props, nombreCapa){
-
-  document.getElementById("infoTitle").innerText = nombreCapa;
-
-  var html="<table>";
-  for(var k in props){
-    html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
-  }
-  html+="</table>";
-
-  document.getElementById("infoContent").innerHTML = html;
-  document.getElementById("infoPanel").style.display="block";
+document.getElementById("infoTitle").innerText = nombreCapa;
+var html="<table>";
+for(var k in props){
+html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
 }
-
+html+="</table>";
+document.getElementById("infoContent").innerHTML = html;
+document.getElementById("infoPanel").style.display="block";
+}
 document.getElementById("closeBtn").onclick=function(){
-  document.getElementById("infoPanel").style.display="none";
+document.getElementById("infoPanel").style.display="none";
 };
 
-// -------- CARGADOR GENERICO --------
-function cargarGeoJSON(url, estilo, nombreCapa, tipo="polygon"){
-
-  return fetch(url)
-  .then(r=>r.json())
-  .then(data=>{
-    return L.geoJSON(data,{
-      style: estilo,
-      pointToLayer: tipo==="point"
-        ? (f,latlng)=>L.circleMarker(latlng,estilo)
-        : undefined,
-      onEachFeature:(f,l)=>{
-        l.on("click",function(e){
-          L.DomEvent.stopPropagation(e);
-          mostrarAtributos(f.properties, nombreCapa);
-        });
-      }
-    });
-  });
+// -------- FUNCION FILTRO --------
+function aplicarFiltro(layer, campoValores){
+layer.clearLayers();
+L.geoJSON(layer.originalData,{
+style: layer.options.style,
+pointToLayer: layer.options.pointToLayer,
+onEachFeature:(f,l)=>{
+let cumple=true;
+for(let campo in campoValores){
+if(campoValores[campo] &&
+f.properties[campo]!=campoValores[campo]) cumple=false;
+}
+if(cumple){
+l.on("click",()=>mostrarAtributos(f.properties, layer.nombre));
+layer.addLayer(l);
+}
+}
+});
 }
 
-// -------- CARGA ORDENADA --------
-var sectorLayer, manzanaLayer, loteLayer,
-    edificaLayer, construccionLayer, puertaLayer;
+// -------- CARGA CAPAS --------
+function cargar(url, estilo, nombre, tipo="polygon"){
+return fetch(url)
+.then(r=>r.json())
+.then(data=>{
+var layer=L.geoJSON(data,{
+style: estilo,
+pointToLayer: tipo==="point"
+? (f,latlng)=>L.circleMarker(latlng,estilo)
+: undefined,
+onEachFeature:(f,l)=>{
+l.on("click",()=>mostrarAtributos(f.properties,nombre));
+}
+});
+layer.originalData=data;
+layer.nombre=nombre;
+return layer;
+});
+}
+
+var sectorLayer,manzanaLayer,loteLayer,edificaLayer,construccionLayer,puertaLayer;
 
 Promise.all([
-
-  cargarGeoJSON('data/tg_sector.geojson',
-    {color:"#6b7280",weight:2,fill:false},"tg_sector"),
-
-  cargarGeoJSON('data/tg_manzana.geojson',
-    {color:"#2563eb",weight:1,fill:false},"tg_manzana"),
-
-  cargarGeoJSON('data/tg_lote.geojson',
-    {color:"#16a34a",weight:1,fillOpacity:0.4},"tg_lote"),
-
-  cargarGeoJSON('data/tg_edifica.geojson',
-    {color:"#f59e0b",weight:1,fillOpacity:0.5},"tg_edifica"),
-
-  cargarGeoJSON('data/tg_construccion.geojson',
-    {color:"#ef4444",weight:1,fillOpacity:0.6},"tg_construccion"),
-
-  cargarGeoJSON('data/tg_puerta.geojson',
-    {radius:3,color:"#000",fillOpacity:1},
-    "tg_puerta","point")
-
+cargar('data/tg_sector.geojson',{color:"#6b7280",weight:2,fill:false},"tg_sector"),
+cargar('data/tg_manzana.geojson',{color:"#2563eb",weight:1,fill:false},"tg_manzana"),
+cargar('data/tg_lote.geojson',{color:"#16a34a",weight:1,fillOpacity:0.4},"tg_lote"),
+cargar('data/tg_edifica.geojson',{color:"#f59e0b",weight:1,fillOpacity:0.5},"tg_edifica"),
+cargar('data/tg_construccion.geojson',{color:"#ef4444",weight:1,fillOpacity:0.6},"tg_construccion"),
+cargar('data/tg_puerta.geojson',{radius:3,color:"#000"},"tg_puerta","point")
 ]).then(function(layers){
 
-  sectorLayer = layers[0].addTo(map);
-  manzanaLayer = layers[1].addTo(map);
-  loteLayer = layers[2].addTo(map);
-  edificaLayer = layers[3].addTo(map);
-  construccionLayer = layers[4].addTo(map);
-  puertaLayer = layers[5].addTo(map);
+sectorLayer=layers[0].addTo(map);
+manzanaLayer=layers[1].addTo(map);
+loteLayer=layers[2].addTo(map);
+edificaLayer=layers[3].addTo(map);
+construccionLayer=layers[4].addTo(map);
+puertaLayer=layers[5].addTo(map);
 
-  // ORDEN REAL (abajo → arriba)
-  sectorLayer.bringToBack();
-  manzanaLayer.bringToFront();
-  loteLayer.bringToFront();
-  edificaLayer.bringToFront();
-  construccionLayer.bringToFront();
-  puertaLayer.bringToFront();
+sectorLayer.bringToBack();
+manzanaLayer.bringToFront();
+loteLayer.bringToFront();
+edificaLayer.bringToFront();
+construccionLayer.bringToFront();
+puertaLayer.bringToFront();
 
 });
 
-// -------- TOGGLE CAPAS --------
-function toggleLayer(id, layer){
-  document.getElementById(id)
-  .addEventListener("change",function(){
-    if(this.checked){
-      map.addLayer(layer);
-    }else{
-      map.removeLayer(layer);
-    }
-  });
+// -------- FILTRAR --------
+function filtrar(tipo){
+
+if(tipo==="lote"){
+aplicarFiltro(loteLayer,{
+cod_mzna:f_lote_mzn.value,
+cod_lote:f_lote_cod.value
+});
 }
 
-setTimeout(function(){
-  toggleLayer("chk_sector",sectorLayer);
-  toggleLayer("chk_manzana",manzanaLayer);
-  toggleLayer("chk_lote",loteLayer);
-  toggleLayer("chk_edifica",edificaLayer);
-  toggleLayer("chk_construccion",construccionLayer);
-  toggleLayer("chk_puerta",puertaLayer);
-},1000);
+if(tipo==="edifica"){
+aplicarFiltro(edificaLayer,{
+cod_mzna:f_edi_mzn.value,
+cod_lote:f_edi_cod.value
+});
+}
+
+if(tipo==="construccion"){
+aplicarFiltro(construccionLayer,{
+cod_mzna:f_con_mzn.value,
+cod_lote:f_con_cod.value,
+cod_piso:f_con_piso.value
+});
+}
+
+if(tipo==="puerta"){
+aplicarFiltro(puertaLayer,{
+cod_mzna:f_pue_mzn.value,
+cod_lote:f_pue_cod.value
+});
+}
+}
+
+// -------- TOGGLE --------
+function toggle(el){
+let c=el.nextElementSibling;
+c.style.display=c.style.display==="block"?"none":"block";
+}
 
 </script>
 </body>
