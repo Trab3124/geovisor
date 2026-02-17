@@ -24,76 +24,51 @@ header{
 
 #map { height: calc(100vh - 65px); }
 
-.panel{
+#panel {
   position:absolute;
   right:10px;
   top:80px;
-  width:320px;
+  width:280px;
   background:white;
   border-radius:8px;
   padding:10px;
   box-shadow:0 2px 8px rgba(0,0,0,0.3);
-  max-height:400px;
+  max-height:350px;
   overflow:auto;
   display:none;
   z-index:1000;
 }
 
-.filtro{
-  position:absolute;
-  left:10px;
-  top:80px;
-  width:250px;
-  background:white;
-  border-radius:8px;
-  padding:10px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.3);
-  z-index:1000;
-}
-
-select, button{
+table{
   width:100%;
-  margin-top:5px;
-  padding:5px;
+  border-collapse:collapse;
+  font-size:12px;
 }
 
-.leaflet-tooltip{
-  background:white;
-  border:1px solid #333;
-  font-size:11px;
-  padding:2px;
+td{
+  border:1px solid #ddd;
+  padding:4px;
 }
 </style>
 </head>
 <body>
 
 <header>Geovisor de Avance Catastral</header>
-
 <div id="map"></div>
-
-<div class="panel" id="panelAtributos">
-  <div style="text-align:right">
-    <button onclick="anterior()">Anterior</button>
-    <button onclick="siguiente()">Siguiente</button>
-    <button onclick="cerrarPanel()">X</button>
-  </div>
-  <div id="contenido"></div>
-</div>
-
-<div class="filtro">
-  <b>Filtro</b>
-  <select id="fSector"></select>
-  <select id="fManzana"></select>
-  <select id="fLote"></select>
-  <button onclick="aplicarFiltro()">Aplicar</button>
-  <button onclick="limpiarFiltro()">Limpiar</button>
-</div>
+<div id="panel"></div>
 
 <script>
 
-var map = L.map('map',{maxZoom:22,minZoom:5}).setView([-11.99,-77.05],15);
+var map = L.map('map',{
+  maxZoom:22,
+  minZoom:5
+}).setView([-11.99,-77.05],15);
 
-var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:22}).addTo(map);
+// BASES
+var osm = L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+{maxZoom:22}
+).addTo(map);
 
 var sat = L.tileLayer(
 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -102,140 +77,106 @@ var sat = L.tileLayer(
 
 L.control.layers({"OSM":osm,"Satelital":sat}).addTo(map);
 
+// BUSCADOR
 L.Control.geocoder({
- defaultMarkGeocode:true,
- placeholder:"Buscar dirección o lugar..."
+ defaultMarkGeocode:true
 }).addTo(map);
 
-var todasCapas = [];
-var resultadosClick = [];
-var indiceActual = 0;
-
-// PANEL
-function mostrarPanel(){
- if(resultadosClick.length==0) return;
- var props = resultadosClick[indiceActual].feature.properties;
+// PANEL ATRIBUTOS
+function mostrarAtributos(props){
  var html="<table>";
  for(var k in props){
    html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
  }
  html+="</table>";
- document.getElementById("contenido").innerHTML=html;
- document.getElementById("panelAtributos").style.display="block";
+ document.getElementById("panel").innerHTML=html;
+ document.getElementById("panel").style.display="block";
 }
 
-function siguiente(){
- if(indiceActual<resultadosClick.length-1){
-   indiceActual++;
-   mostrarPanel();
- }
-}
+// VARIABLES CAPAS
+var sectorLayer, manzanaLayer, loteLayer, puertaLayer;
 
-function anterior(){
- if(indiceActual>0){
-   indiceActual--;
-   mostrarPanel();
- }
-}
-
-function cerrarPanel(){
- document.getElementById("panelAtributos").style.display="none";
-}
-
-// CLICK MULTICAPA
-map.on("click",function(e){
- resultadosClick=[];
- indiceActual=0;
- todasCapas.forEach(function(layer){
-   layer.eachLayer(function(l){
-     if(l.getBounds && l.getBounds().contains(e.latlng)){
-       resultadosClick.push(l);
-     }
-   });
- });
- mostrarPanel();
-});
-
-// CARGAR CAPAS
-function cargarPoligono(url, estilo){
- fetch(url).then(r=>r.json()).then(data=>{
-   var layer=L.geoJSON(data,{
-     style:estilo,
-     onEachFeature:function(f,l){
-       l.bindTooltip("",{permanent:false});
-     }
+// CARGA DIFERIDA
+function cargarSector(){
+ if(sectorLayer) return;
+ fetch('data/tg_sector.geojson')
+ .then(r=>r.json())
+ .then(data=>{
+   sectorLayer=L.geoJSON(data,{
+     style:{color:"#6b7280",weight:2,fill:false},
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
    }).addTo(map);
-   todasCapas.push(layer);
  });
 }
 
-function cargarPuntos(url){
- fetch(url).then(r=>r.json()).then(data=>{
-   var layer=L.geoJSON(data,{
-     pointToLayer:function(f,latlng){
-       return L.circleMarker(latlng,{
-         radius:3,color:"#000",fillColor:"#000",fillOpacity:0.9
-       });
-     }
-   }).addTo(map);
-   todasCapas.push(layer);
- });
-}
-
-// Cargar
-cargarPoligono('data/tg_sector.geojson',{color:"#6b7280",weight:2,fill:false});
-cargarPoligono('data/tg_manzana.geojson',{color:"#2563eb",weight:2,fill:false});
-cargarPoligono('data/tg_lote.geojson',{color:"#16a34a",weight:1,fillOpacity:0.4});
-cargarPoligono('data/tg_edifica.geojson',{color:"#f97316",weight:1});
-cargarPoligono('data/tg_construccion.geojson',{color:"#dc2626",weight:1});
-cargarPoligono('data/tg_construccion_2.geojson',{color:"#9333ea",weight:1});
-cargarPuntos('data/tg_puerta.geojson');
-cargarPoligono('data/uca.geojson',{color:"#0891b2",weight:1});
-
-// FILTRO
-function aplicarFiltro(){
- var s=document.getElementById("fSector").value;
- var m=document.getElementById("fManzana").value;
- var l=document.getElementById("fLote").value;
-
- todasCapas.forEach(function(layer){
-   layer.eachLayer(function(f){
-     var p=f.feature.properties;
-     var visible=true;
-     if(s && p.cod_sector!=s) visible=false;
-     if(m && p.cod_mzna!=m) visible=false;
-     if(l && p.cod_lote!=l) visible=false;
-     if(visible){ f.addTo(map); }
-     else{ map.removeLayer(f); }
+function cargarManzana(){
+ if(manzanaLayer) return;
+ fetch('data/tg_manzana.geojson')
+ .then(r=>r.json())
+ .then(data=>{
+   manzanaLayer=L.geoJSON(data,{
+     style:{color:"#2563eb",weight:2,fill:false},
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
    });
  });
 }
 
-function limpiarFiltro(){
- location.reload();
+function cargarLote(){
+ if(loteLayer) return;
+ fetch('data/tg_lote.geojson')
+ .then(r=>r.json())
+ .then(data=>{
+   loteLayer=L.geoJSON(data,{
+     style:{color:"#16a34a",weight:1,fillOpacity:0.4},
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+   });
+ });
 }
 
-// ETIQUETAS SEGÚN ZOOM
+function cargarPuerta(){
+ if(puertaLayer) return;
+ fetch('data/tg_puerta.geojson')
+ .then(r=>r.json())
+ .then(data=>{
+   puertaLayer=L.geoJSON(data,{
+     pointToLayer:(f,latlng)=>
+       L.circleMarker(latlng,{radius:2,color:"#000",fillOpacity:0.8}),
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+   });
+ });
+}
+
+// CONTROL POR ZOOM
 map.on("zoomend",function(){
  var z=map.getZoom();
- todasCapas.forEach(function(layer){
-   layer.eachLayer(function(l){
-     var p=l.feature.properties;
-     if(z<=14 && p.cod_sector){
-       l.bindTooltip(p.cod_sector,{permanent:true});
-     }
-     else if(z>14 && z<=17 && p.cod_mzna){
-       l.bindTooltip(p.cod_mzna,{permanent:true});
-     }
-     else if(z>17 && p.cod_lote){
-       l.bindTooltip(p.cod_mzna+"-"+p.cod_lote,{permanent:true});
-     }
-     else{
-       l.unbindTooltip();
-     }
-   });
- });
+
+ if(z>=10) cargarSector();
+
+ if(z>=14){
+   cargarManzana();
+   if(!map.hasLayer(manzanaLayer)) map.addLayer(manzanaLayer);
+ } else if(manzanaLayer){
+   map.removeLayer(manzanaLayer);
+ }
+
+ if(z>=17){
+   cargarLote();
+   if(!map.hasLayer(loteLayer)) map.addLayer(loteLayer);
+ } else if(loteLayer){
+   map.removeLayer(loteLayer);
+ }
+
+ if(z>=19){
+   cargarPuerta();
+   if(!map.hasLayer(puertaLayer)) map.addLayer(puertaLayer);
+ } else if(puertaLayer){
+   map.removeLayer(puertaLayer);
+ }
+
 });
+
+// CARGA INICIAL
+cargarSector();
 
 </script>
 </body>
