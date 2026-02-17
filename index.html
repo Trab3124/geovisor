@@ -28,15 +28,23 @@ header{
   position:absolute;
   right:10px;
   top:80px;
-  width:280px;
+  width:300px;
   background:white;
   border-radius:8px;
   padding:10px;
   box-shadow:0 2px 8px rgba(0,0,0,0.3);
-  max-height:350px;
+  max-height:400px;
   overflow:auto;
   display:none;
   z-index:1000;
+}
+
+#panel h3{
+  margin:0 0 8px 0;
+  padding-bottom:5px;
+  border-bottom:1px solid #ddd;
+  font-size:15px;
+  color:#1e40af;
 }
 
 table{
@@ -48,6 +56,20 @@ table{
 td{
   border:1px solid #ddd;
   padding:4px;
+}
+
+.label-manzana{
+  font-size:12px;
+  font-weight:bold;
+  color:#1d4ed8;
+  text-shadow:1px 1px 2px white;
+}
+
+.label-lote{
+  font-size:11px;
+  font-weight:bold;
+  color:#166534;
+  text-shadow:1px 1px 2px white;
 }
 </style>
 </head>
@@ -78,13 +100,11 @@ var sat = L.tileLayer(
 L.control.layers({"OSM":osm,"Satelital":sat}).addTo(map);
 
 // BUSCADOR
-L.Control.geocoder({
- defaultMarkGeocode:true
-}).addTo(map);
+L.Control.geocoder({ defaultMarkGeocode:true }).addTo(map);
 
 // PANEL ATRIBUTOS
-function mostrarAtributos(props){
- var html="<table>";
+function mostrarAtributos(props, capaNombre){
+ var html="<h3>Tabla de atributos - "+capaNombre+"</h3><table>";
  for(var k in props){
    html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
  }
@@ -104,7 +124,7 @@ function cargarSector(){
  .then(data=>{
    sectorLayer=L.geoJSON(data,{
      style:{color:"#6b7280",weight:2,fill:false},
-     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties,"SECTOR"))
    }).addTo(map);
  });
 }
@@ -116,7 +136,16 @@ function cargarManzana(){
  .then(data=>{
    manzanaLayer=L.geoJSON(data,{
      style:{color:"#2563eb",weight:2,fill:false},
-     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+     onEachFeature:(f,l)=>{
+        l.on("click",()=>mostrarAtributos(f.properties,"MANZANA"));
+        if(f.properties.cod_mzna){
+          l.bindTooltip(f.properties.cod_mzna,{
+            permanent:true,
+            direction:"center",
+            className:"label-manzana"
+          });
+        }
+     }
    });
  });
 }
@@ -128,7 +157,16 @@ function cargarLote(){
  .then(data=>{
    loteLayer=L.geoJSON(data,{
      style:{color:"#16a34a",weight:1,fillOpacity:0.4},
-     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+     onEachFeature:(f,l)=>{
+        l.on("click",()=>mostrarAtributos(f.properties,"LOTE"));
+        if(f.properties.cod_lote){
+          l.bindTooltip(f.properties.cod_lote,{
+            permanent:true,
+            direction:"center",
+            className:"label-lote"
+          });
+        }
+     }
    });
  });
 }
@@ -141,7 +179,7 @@ function cargarPuerta(){
    puertaLayer=L.geoJSON(data,{
      pointToLayer:(f,latlng)=>
        L.circleMarker(latlng,{radius:2,color:"#000",fillOpacity:0.8}),
-     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties))
+     onEachFeature:(f,l)=>l.on("click",()=>mostrarAtributos(f.properties,"PUERTA"))
    });
  });
 }
