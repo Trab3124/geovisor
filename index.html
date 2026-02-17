@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Ortoimagen</title>
+    <title>Geovisor Catastral - Ortoimagen Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -55,7 +55,6 @@
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
             background: none; border: none; box-shadow: none;
         }
-        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -86,7 +85,7 @@
 
 <div id="search-panel" class="panel">
     <h3>Búsqueda Jerárquica</h3>
-    <p style="font-size: 10px; color: #1e40af; margin-top: -5px;">* Haz clic en un lote del mapa para filtrar</p>
+    <p style="font-size: 10px; color: #1e40af; margin-top: -5px;">* Haz clic en un lote para filtrar</p>
     <div style="margin-bottom:8px">
         <label>Sector</label>
         <select id="sel-sector"><option value="">Seleccione...</option></select>
@@ -103,43 +102,37 @@
 </div>
 
 <script>
-    // Inicialización del Mapa
-    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
+    // 1. CONFIGURACIÓN INICIAL DEL MAPA
+    // He puesto el zoom inicial en 12 para que coincida con tus primeras teselas
+    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 12);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Definición de Capas Base
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-        maxZoom: 24, 
-        maxNativeZoom: 19 
-    }).addTo(map);
+    // 2. CAPAS BASE
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 });
 
-    // CAPA DE TU ORTOIMAGEN (Ruta a tu carpeta local/repositorio)
+    // CARGA DE TU ORTOFOTO (Asegúrate que la carpeta 'ortofoto' esté en la misma ruta que este index.html)
     var ortofotoLocal = L.tileLayer('ortofoto/{z}/{x}/{y}.png', {
         maxZoom: 24,
-        maxNativeZoom: 20, // Ajusta esto al zoom máximo que generaste en QGIS
-        attribution: 'Ortofoto Distrital'
-    });
+        maxNativeZoom: 20, 
+        attribution: 'Ortofoto Municipal'
+    }).addTo(map); // La añadimos por defecto
 
-    var satEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
-        maxZoom: 24, 
-        maxNativeZoom: 19 
-    });
+    var satEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
 
     // Control de Capas Base
     var baseMaps = {
-        "Mapa Callejero": osm,
         "Ortofoto Propia": ortofotoLocal,
+        "Mapa Callejero": osm,
         "Satélite ESRI": satEsri
     };
     L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
 
-    // --- Resto de tu Lógica Geográfica ---
-
+    // 3. CAPAS VECTORIALES
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
         'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
         'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1, interactive: false },
-        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.1, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
         'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
         'tg_puerta': { radius: 5, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1, interactive: false }
@@ -174,7 +167,36 @@
         map.on('zoomend', refreshLabels);
     }
 
-    // --- Funciones de Filtrado y UI (Iguales a tu código previo) ---
+    // --- Lógica de etiquetas y filtrado ---
+
+    function refreshLabels() {
+        labelLayer.clearLayers();
+        const zoom = map.getZoom();
+        const sec = sSec.value, mzn = sMzn.value;
+        if (!mzn) return;
+
+        if (zoom >= 17) {
+            geoLayers['tg_manzana'].eachLayer(l => {
+                if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
+                    L.marker(l.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
+                        interactive: false
+                    }).addTo(labelLayer);
+                }
+            });
+        }
+        if (zoom >= 19) {
+            geoLayers['tg_lote'].eachLayer(l => {
+                const p = l.feature.properties;
+                if (p.cod_mzna === mzn && p.cod_sector === sec) {
+                    L.marker(l.getBounds().getCenter(), {
+                        icon: L.divIcon({ className: 'label-lote', html: p.cod_lote }),
+                        interactive: false
+                    }).addTo(labelLayer);
+                }
+            });
+        }
+    }
 
     function autoFilterByLote(props) {
         sSec.value = props.cod_sector;
@@ -214,7 +236,6 @@
                         l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
-                        else zoomBounds.extend(l.getLatLng());
                     } else {
                         l.setStyle({ opacity: 0, fillOpacity: 0 });
                     }
@@ -223,40 +244,9 @@
         }
         if (currentResultsData.length > 0) {
             map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 22 });
-            document.getElementById('filter-layer-results').value = 'ALL';
             updateResultsUI();
             highlightBorders(currentResultsData.map(d => d.obj));
             refreshLabels();
-        }
-    }
-
-    function refreshLabels() {
-        labelLayer.clearLayers();
-        const zoom = map.getZoom();
-        const sec = sSec.value, mzn = sMzn.value;
-        if (!mzn) return;
-
-        if (zoom >= 17) {
-            geoLayers['tg_manzana'].eachLayer(l => {
-                if (l.feature.properties.cod_mzna === mzn && l.feature.properties.cod_sector === sec) {
-                    L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
-                        interactive: false
-                    }).addTo(labelLayer);
-                }
-            });
-        }
-
-        if (zoom >= 19) {
-            geoLayers['tg_lote'].eachLayer(l => {
-                const p = l.feature.properties;
-                if (p.cod_mzna === mzn && p.cod_sector === sec) {
-                    L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-lote', html: p.cod_lote }),
-                        interactive: false
-                    }).addTo(labelLayer);
-                }
-            });
         }
     }
 
@@ -275,50 +265,25 @@
     }
 
     function updateResultsUI() {
-        const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
         const panel = document.getElementById('results-panel');
         let html = "";
-        let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
-
-        data.forEach((item) => {
-            let badge = '';
-            if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
-            if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
-            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
-                        <span>CAPA: ${item.layer}</span>
-                        ${badge}
-                     </div>`;
+        currentResultsData.forEach((item) => {
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af;">CAPA: ${item.layer}</div>`;
             html += `<table>`;
             for (let key in item.props) {
-                let val = item.props[key];
-                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
-                html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
+                html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || '-'}</td></tr>`;
             }
             html += `</table>`;
         });
-        content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
+        content.innerHTML = html;
         panel.style.display = 'flex';
-    }
-
-    function zoomToFid(layerId, fidValue) {
-        geoLayers[layerId].eachLayer(l => {
-            if (l.feature.properties.fid == fidValue) {
-                if (l.getBounds) map.fitBounds(l.getBounds(), { maxZoom: 22 });
-                else map.setView(l.getLatLng(), 22);
-                highlightBorders([l]);
-            }
-        });
     }
 
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
-            const clone = L.geoJSON(o.feature, {
-                style: { color: 'yellow', weight: 6, fillOpacity: 0, opacity: 1, radius: 8 },
-                pointToLayer: (f, latlng) => L.circleMarker(latlng)
-            });
-            highlightLayer.addLayer(clone);
+            highlightLayer.addLayer(L.geoJSON(o.feature, { style: { color: 'yellow', weight: 4, fillOpacity: 0 } }));
         });
     }
 
@@ -331,7 +296,6 @@
 
     function updateManzanas(callback) {
         sMzn.innerHTML = '<option value="">Seleccione...</option>';
-        sLot.innerHTML = '<option value="">Seleccione...</option>';
         sMzn.disabled = !sSec.value;
         if(sSec.value) {
             let list = [];
@@ -358,17 +322,11 @@
 
     function resetFilters() {
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
-        closeResults();
-        labelLayer.clearLayers();
-        for (let id in geoLayers) {
-            geoLayers[id].eachLayer(l => l.setStyle(styles[id]));
-        }
-        map.setView([-12.046, -77.042], 16);
-    }
-
-    function closeResults() {
         document.getElementById('results-panel').style.display = 'none';
+        labelLayer.clearLayers();
         highlightLayer.clearLayers();
+        for (let id in geoLayers) { geoLayers[id].eachLayer(l => l.setStyle(styles[id])); }
+        map.setView([-12.046, -77.042], 12);
     }
 
     init();
