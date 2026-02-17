@@ -21,16 +21,17 @@ header{
 
 #map { height: calc(100vh - 200px); }
 
-#filtroPanel{
+#capasPanel{
   position:absolute;
   right:10px;
   top:80px;
-  width:300px;
+  width:230px;
   background:white;
   padding:10px;
   border-radius:8px;
   box-shadow:0 2px 8px rgba(0,0,0,0.3);
   z-index:1000;
+  font-size:13px;
 }
 
 #atributosPanel{
@@ -58,10 +59,9 @@ td{
   padding:4px;
 }
 
-select{
-  width:100%;
-  margin-bottom:8px;
-  padding:4px;
+label{
+  display:block;
+  margin-bottom:4px;
 }
 </style>
 </head>
@@ -71,14 +71,14 @@ select{
 
 <div id="map"></div>
 
-<div id="filtroPanel">
-  <b>Filtrar Manzana</b>
-  <select id="sectorSelect">
-    <option value="">-- Sector --</option>
-  </select>
-  <select id="manzanaSelect">
-    <option value="">-- Manzana --</option>
-  </select>
+<div id="capasPanel">
+  <b>Capas</b><br><br>
+  <label><input type="checkbox" id="chk_sector" checked> tg_sector</label>
+  <label><input type="checkbox" id="chk_manzana" checked> tg_manzana</label>
+  <label><input type="checkbox" id="chk_lote" checked> tg_lote</label>
+  <label><input type="checkbox" id="chk_edifica" checked> tg_edifica</label>
+  <label><input type="checkbox" id="chk_construccion" checked> tg_construccion</label>
+  <label><input type="checkbox" id="chk_puerta" checked> tg_puerta</label>
 </div>
 
 <div id="atributosPanel"></div>
@@ -93,11 +93,6 @@ L.tileLayer(
 {maxZoom:22}
 ).addTo(map);
 
-// ---------------- VARIABLES ----------------
-var sectorLayer, manzanaLayer, loteLayer, puertaLayer;
-var sectorData, manzanaData, loteData, puertaData;
-var highlightLayer;
-
 // ---------------- TABLA ATRIBUTOS ----------------
 function mostrarAtributos(props, nombreCapa){
   var html="<h3>Tabla de atributos - "+nombreCapa+"</h3><table>";
@@ -108,138 +103,111 @@ function mostrarAtributos(props, nombreCapa){
   document.getElementById("atributosPanel").innerHTML=html;
 }
 
-// ---------------- RESALTADO ----------------
-function resaltar(feature, nombreCapa){
+// ---------------- FUNCION GENERICA CARGA ----------------
+function cargarGeoJSON(url, estilo, nombreCapa, tipo="polygon"){
 
-  if(highlightLayer){
-    map.removeLayer(highlightLayer);
-  }
-
-  highlightLayer=L.geoJSON(feature,{
-    style:{color:"red",weight:3,fillOpacity:0.1}
-  }).addTo(map);
-
-  map.fitBounds(highlightLayer.getBounds());
-
-  highlightLayer.eachLayer(function(l){
-    l.bindTooltip(Object.values(feature.properties)[0],{
-      permanent:true,
-      direction:"center"
-    }).openTooltip();
+  return fetch(url)
+  .then(r=>r.json())
+  .then(data=>{
+    return L.geoJSON(data,{
+      style: estilo,
+      pointToLayer: tipo==="point"
+        ? (f,latlng)=>L.circleMarker(latlng,estilo)
+        : undefined,
+      onEachFeature:(f,l)=>{
+        l.on("click",function(e){
+          L.DomEvent.stopPropagation(e);
+          mostrarAtributos(f.properties, nombreCapa);
+        });
+      }
+    });
   });
-
-  mostrarAtributos(feature.properties, nombreCapa);
 }
 
-// ---------------- CARGAR SECTOR ----------------
-fetch('data/tg_sector.geojson')
-.then(r=>r.json())
-.then(data=>{
-  sectorData=data;
+// ---------------- CARGA CAPAS EN ORDEN ----------------
+var sectorLayer, manzanaLayer, loteLayer,
+    edificaLayer, construccionLayer, puertaLayer;
 
-  sectorLayer=L.geoJSON(data,{
-    style:{color:"#6b7280",weight:2,fill:false},
-    onEachFeature:(f,l)=>{
-      l.on("click",()=>resaltar(f,"SECTOR"));
+Promise.all([
+
+  cargarGeoJSON(
+    'data/tg_sector.geojson',
+    {color:"#6b7280",weight:2,fill:false},
+    "tg_sector"
+  ),
+
+  cargarGeoJSON(
+    'data/tg_manzana.geojson',
+    {color:"#2563eb",weight:1,fill:false},
+    "tg_manzana"
+  ),
+
+  cargarGeoJSON(
+    'data/tg_lote.geojson',
+    {color:"#16a34a",weight:1,fillOpacity:0.4},
+    "tg_lote"
+  ),
+
+  cargarGeoJSON(
+    'data/tg_edifica.geojson',
+    {color:"#f59e0b",weight:1,fillOpacity:0.5},
+    "tg_edifica"
+  ),
+
+  cargarGeoJSON(
+    'data/tg_construccion.geojson',
+    {color:"#ef4444",weight:1,fillOpacity:0.6},
+    "tg_construccion"
+  ),
+
+  cargarGeoJSON(
+    'data/tg_puerta.geojson',
+    {radius:3,color:"#000",fillOpacity:0.9},
+    "tg_puerta",
+    "point"
+  )
+
+]).then(function(layers){
+
+  sectorLayer = layers[0].addTo(map);
+  manzanaLayer = layers[1].addTo(map);
+  loteLayer = layers[2].addTo(map);
+  edificaLayer = layers[3].addTo(map);
+  construccionLayer = layers[4].addTo(map);
+  puertaLayer = layers[5].addTo(map);
+
+  // ORDEN VISUAL (de abajo hacia arriba)
+  sectorLayer.bringToBack();
+  manzanaLayer.bringToFront();
+  loteLayer.bringToFront();
+  edificaLayer.bringToFront();
+  construccionLayer.bringToFront();
+  puertaLayer.bringToFront();
+});
+
+// ---------------- CONTROL CHECKBOX ----------------
+function toggleLayer(checkboxId, layer){
+  document.getElementById(checkboxId)
+  .addEventListener("change",function(){
+    if(this.checked){
+      map.addLayer(layer);
+    }else{
+      map.removeLayer(layer);
     }
-  }).addTo(map);
-
-  var sectores=[...new Set(data.features.map(f=>f.properties.cod_sector))];
-  sectores.sort().forEach(s=>{
-    var opt=document.createElement("option");
-    opt.value=s;
-    opt.text=s;
-    document.getElementById("sectorSelect").appendChild(opt);
   });
-});
+}
 
-// ---------------- CARGAR MANZANA ----------------
-fetch('data/tg_manzana.geojson')
-.then(r=>r.json())
-.then(data=>{
-  manzanaData=data;
-
-  manzanaLayer=L.geoJSON(data,{
-    style:{color:"#2563eb",weight:1,fill:false},
-    onEachFeature:(f,l)=>{
-      l.on("click",()=>resaltar(f,"MANZANA"));
-    }
-  }).addTo(map);
-});
-
-// ---------------- CARGAR LOTE ----------------
-fetch('data/tg_lote.geojson')
-.then(r=>r.json())
-.then(data=>{
-  loteData=data;
-
-  loteLayer=L.geoJSON(data,{
-    style:{color:"#16a34a",weight:1,fillOpacity:0.4},
-    onEachFeature:(f,l)=>{
-      l.on("click",()=>resaltar(f,"LOTE"));
-    }
-  }).addTo(map);
-});
-
-// ---------------- CARGAR PUERTA ----------------
-fetch('data/tg_puerta.geojson')
-.then(r=>r.json())
-.then(data=>{
-  puertaData=data;
-
-  puertaLayer=L.geoJSON(data,{
-    pointToLayer:(f,latlng)=>
-      L.circleMarker(latlng,{radius:3,color:"#000",fillOpacity:0.8}),
-    onEachFeature:(f,l)=>{
-      l.on("click",()=>resaltar(f,"PUERTA"));
-    }
-  }).addTo(map);
-});
-
-// ---------------- FILTRO SECTOR ----------------
-document.getElementById("sectorSelect")
-.addEventListener("change",function(){
-
-  var val=this.value;
-  var manzanaSelect=document.getElementById("manzanaSelect");
-  manzanaSelect.innerHTML='<option value="">-- Manzana --</option>';
-
-  if(!val) return;
-
-  var manzanasFiltradas=
-    manzanaData.features
-    .filter(f=>f.properties.cod_sector==val);
-
-  var codigos=[...new Set(
-    manzanasFiltradas.map(f=>f.properties.cod_mzna)
-  )];
-
-  codigos.sort().forEach(m=>{
-    var opt=document.createElement("option");
-    opt.value=m;
-    opt.text=m;
-    manzanaSelect.appendChild(opt);
-  });
-
-});
-
-// ---------------- FILTRO MANZANA ----------------
-document.getElementById("manzanaSelect")
-.addEventListener("change",function(){
-
-  var val=this.value;
-  if(!val) return;
-
-  var feature=
-    manzanaData.features
-    .find(f=>f.properties.cod_mzna==val);
-
-  resaltar(feature,"MANZANA");
-});
+setTimeout(function(){
+  toggleLayer("chk_sector",sectorLayer);
+  toggleLayer("chk_manzana",manzanaLayer);
+  toggleLayer("chk_lote",loteLayer);
+  toggleLayer("chk_edifica",edificaLayer);
+  toggleLayer("chk_construccion",construccionLayer);
+  toggleLayer("chk_puerta",puertaLayer);
+},1000);
 
 </script>
 </body>
 </html>
-
 
 
