@@ -19,49 +19,65 @@ header{
   font-weight:bold;
 }
 
-#map { height: calc(100vh - 200px); }
+#map { height: calc(100vh - 65px); }
 
-#capasPanel{
+/* PANEL ATRIBUTOS SUPERIOR DERECHO */
+#infoPanel{
   position:absolute;
-  right:10px;
   top:80px;
-  width:230px;
+  right:10px;
+  width:320px;
+  background:white;
+  border-radius:8px;
+  box-shadow:0 3px 10px rgba(0,0,0,0.4);
+  z-index:1000;
+  display:none;
+}
+
+#infoHeader{
+  background:#f3f4f6;
+  padding:8px;
+  font-weight:bold;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+#infoContent{
+  padding:10px;
+  max-height:350px;
+  overflow:auto;
+  font-size:12px;
+}
+
+#closeBtn{
+  cursor:pointer;
+  color:red;
+  font-weight:bold;
+}
+
+/* PANEL CAPAS */
+#layerPanel{
+  position:absolute;
+  top:80px;
+  left:10px;
+  width:220px;
   background:white;
   padding:10px;
   border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+  box-shadow:0 3px 10px rgba(0,0,0,0.4);
   z-index:1000;
   font-size:13px;
-}
-
-#atributosPanel{
-  height:150px;
-  background:white;
-  border-top:3px solid #1e40af;
-  overflow:auto;
-  padding:10px;
-}
-
-#atributosPanel h3{
-  margin:0 0 5px 0;
-  color:#1e40af;
-  font-size:14px;
 }
 
 table{
   width:100%;
   border-collapse:collapse;
-  font-size:12px;
 }
 
 td{
   border:1px solid #ddd;
   padding:4px;
-}
-
-label{
-  display:block;
-  margin-bottom:4px;
 }
 </style>
 </head>
@@ -71,17 +87,25 @@ label{
 
 <div id="map"></div>
 
-<div id="capasPanel">
+<!-- PANEL CAPAS -->
+<div id="layerPanel">
   <b>Capas</b><br><br>
-  <label><input type="checkbox" id="chk_sector" checked> tg_sector</label>
-  <label><input type="checkbox" id="chk_manzana" checked> tg_manzana</label>
-  <label><input type="checkbox" id="chk_lote" checked> tg_lote</label>
-  <label><input type="checkbox" id="chk_edifica" checked> tg_edifica</label>
-  <label><input type="checkbox" id="chk_construccion" checked> tg_construccion</label>
+  <label><input type="checkbox" id="chk_sector" checked> tg_sector</label><br>
+  <label><input type="checkbox" id="chk_manzana" checked> tg_manzana</label><br>
+  <label><input type="checkbox" id="chk_lote" checked> tg_lote</label><br>
+  <label><input type="checkbox" id="chk_edifica" checked> tg_edifica</label><br>
+  <label><input type="checkbox" id="chk_construccion" checked> tg_construccion</label><br>
   <label><input type="checkbox" id="chk_puerta" checked> tg_puerta</label>
 </div>
 
-<div id="atributosPanel"></div>
+<!-- PANEL INFORMACIÓN -->
+<div id="infoPanel">
+  <div id="infoHeader">
+    <span id="infoTitle">Capa</span>
+    <span id="closeBtn">X</span>
+  </div>
+  <div id="infoContent"></div>
+</div>
 
 <script>
 
@@ -93,17 +117,26 @@ L.tileLayer(
 {maxZoom:22}
 ).addTo(map);
 
-// ---------------- TABLA ATRIBUTOS ----------------
+// -------- FUNCION MOSTRAR ATRIBUTOS --------
 function mostrarAtributos(props, nombreCapa){
-  var html="<h3>Tabla de atributos - "+nombreCapa+"</h3><table>";
+
+  document.getElementById("infoTitle").innerText = nombreCapa;
+
+  var html="<table>";
   for(var k in props){
     html+="<tr><td><b>"+k+"</b></td><td>"+props[k]+"</td></tr>";
   }
   html+="</table>";
-  document.getElementById("atributosPanel").innerHTML=html;
+
+  document.getElementById("infoContent").innerHTML = html;
+  document.getElementById("infoPanel").style.display="block";
 }
 
-// ---------------- FUNCION GENERICA CARGA ----------------
+document.getElementById("closeBtn").onclick=function(){
+  document.getElementById("infoPanel").style.display="none";
+};
+
+// -------- CARGADOR GENERICO --------
 function cargarGeoJSON(url, estilo, nombreCapa, tipo="polygon"){
 
   return fetch(url)
@@ -124,48 +157,30 @@ function cargarGeoJSON(url, estilo, nombreCapa, tipo="polygon"){
   });
 }
 
-// ---------------- CARGA CAPAS EN ORDEN ----------------
+// -------- CARGA ORDENADA --------
 var sectorLayer, manzanaLayer, loteLayer,
     edificaLayer, construccionLayer, puertaLayer;
 
 Promise.all([
 
-  cargarGeoJSON(
-    'data/tg_sector.geojson',
-    {color:"#6b7280",weight:2,fill:false},
-    "tg_sector"
-  ),
+  cargarGeoJSON('data/tg_sector.geojson',
+    {color:"#6b7280",weight:2,fill:false},"tg_sector"),
 
-  cargarGeoJSON(
-    'data/tg_manzana.geojson',
-    {color:"#2563eb",weight:1,fill:false},
-    "tg_manzana"
-  ),
+  cargarGeoJSON('data/tg_manzana.geojson',
+    {color:"#2563eb",weight:1,fill:false},"tg_manzana"),
 
-  cargarGeoJSON(
-    'data/tg_lote.geojson',
-    {color:"#16a34a",weight:1,fillOpacity:0.4},
-    "tg_lote"
-  ),
+  cargarGeoJSON('data/tg_lote.geojson',
+    {color:"#16a34a",weight:1,fillOpacity:0.4},"tg_lote"),
 
-  cargarGeoJSON(
-    'data/tg_edifica.geojson',
-    {color:"#f59e0b",weight:1,fillOpacity:0.5},
-    "tg_edifica"
-  ),
+  cargarGeoJSON('data/tg_edifica.geojson',
+    {color:"#f59e0b",weight:1,fillOpacity:0.5},"tg_edifica"),
 
-  cargarGeoJSON(
-    'data/tg_construccion.geojson',
-    {color:"#ef4444",weight:1,fillOpacity:0.6},
-    "tg_construccion"
-  ),
+  cargarGeoJSON('data/tg_construccion.geojson',
+    {color:"#ef4444",weight:1,fillOpacity:0.6},"tg_construccion"),
 
-  cargarGeoJSON(
-    'data/tg_puerta.geojson',
-    {radius:3,color:"#000",fillOpacity:0.9},
-    "tg_puerta",
-    "point"
-  )
+  cargarGeoJSON('data/tg_puerta.geojson',
+    {radius:3,color:"#000",fillOpacity:1},
+    "tg_puerta","point")
 
 ]).then(function(layers){
 
@@ -176,18 +191,19 @@ Promise.all([
   construccionLayer = layers[4].addTo(map);
   puertaLayer = layers[5].addTo(map);
 
-  // ORDEN VISUAL (de abajo hacia arriba)
+  // ORDEN REAL (abajo → arriba)
   sectorLayer.bringToBack();
   manzanaLayer.bringToFront();
   loteLayer.bringToFront();
   edificaLayer.bringToFront();
   construccionLayer.bringToFront();
   puertaLayer.bringToFront();
+
 });
 
-// ---------------- CONTROL CHECKBOX ----------------
-function toggleLayer(checkboxId, layer){
-  document.getElementById(checkboxId)
+// -------- TOGGLE CAPAS --------
+function toggleLayer(id, layer){
+  document.getElementById(id)
   .addEventListener("change",function(){
     if(this.checked){
       map.addLayer(layer);
@@ -209,5 +225,6 @@ setTimeout(function(){
 </script>
 </body>
 </html>
+
 
 
