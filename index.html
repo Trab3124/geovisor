@@ -44,10 +44,9 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        /* ETIQUETAS PERSONALIZADAS */
+        /* ETIQUETAS */
         .label-sector {
             font-size: 18px; font-weight: bold; color: #1e40af;
-            /* Buffer Amarillo potente con sombras múltiples */
             text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200, 0 2px 0 #fff200, 0 -2px 0 #fff200, 2px 0 0 #fff200, -2px 0 0 #fff200;
             background: none; border: none; box-shadow: none; white-space: nowrap;
         }
@@ -61,6 +60,7 @@
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
             background: none; border: none; box-shadow: none;
         }
+        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -121,6 +121,9 @@
     L.control.layers({ "Satélite": sat, "Ortofoto": ortoimagen }, null, {position: 'topright'}).addTo(map);
 
     const BASE_PATH = './data';
+    const sectorLayerKey = 'tg_sector';
+    const detailLayerKeys = ['tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
+
     const styles = {
         'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: true },
         'tg_manzana': { color: "#f97316", weight: 2, fill: false, opacity: 1, interactive: true },
@@ -140,10 +143,10 @@
 
     async function init() {
         try {
-            const res = await fetch(`${BASE_PATH}/tg_sector.geojson`);
+            const res = await fetch(`${BASE_PATH}/${sectorLayerKey}.geojson`);
             const data = await res.json();
-            geoLayers['tg_sector'] = L.geoJSON(data, { 
-                style: styles['tg_sector'],
+            geoLayers[sectorLayerKey] = L.geoJSON(data, { 
+                style: styles[sectorLayerKey],
                 onEachFeature: (f, l) => {
                     L.marker(l.getBounds().getCenter(), {
                         icon: L.divIcon({ className: 'label-sector', html: f.properties.cod_sector }),
@@ -152,7 +155,7 @@
                 }
             }).addTo(map);
             
-            addLayerCheckbox('tg_sector');
+            addLayerCheckbox(sectorLayerKey);
             const sectoresList = populateSectors(data);
             
             geoLayers['tg_manzana'] = L.featureGroup().addTo(map);
@@ -172,8 +175,8 @@
                     }).catch(e => console.warn(`Error sector ${sId}`));
             }
 
-            map.fitBounds(geoLayers['tg_sector'].getBounds());
-            handleLabelsVisibility(); // Check inicial
+            map.fitBounds(geoLayers[sectorLayerKey].getBounds());
+            handleLabelsVisibility();
         } catch(e) { console.error("Error init", e); }
         
         map.on('zoomend', handleLabelsVisibility);
@@ -181,18 +184,11 @@
 
     function handleLabelsVisibility() {
         const zoom = map.getZoom();
-        
-        // Control Etiquetas Sector: Desaparecen si zoom > 17
         if (zoom > 17) {
             if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels);
         } else {
-            // Solo se muestra si el checkbox de sector está activo
-            if(document.getElementById('chk-tg_sector') && document.getElementById('chk-tg_sector').checked) {
-                map.addLayer(sectorLabels);
-            }
+            if(document.getElementById('chk-tg_sector') && document.getElementById('chk-tg_sector').checked) map.addLayer(sectorLabels);
         }
-        
-        // Refrescar etiquetas de Manzana/Lote
         refreshLabels();
     }
 
@@ -242,11 +238,12 @@
         });
     }
 
+    // --- LÓGICA DE SELECCIÓN JERÁRQUICA RECUPERADA ---
     function executeFinalFilter() {
         const sec = sSec.value, mzn = sMzn.value, lot = sLot.value;
         if(!mzn) return;
 
-        // Ocultar geometría de todas las manzanas
+        // Ocultar geometría de manzana
         geoLayers['tg_manzana'].eachLayer(group => {
             group.eachLayer(l => l.setStyle({ opacity: 0, fillOpacity: 0 }));
         });
@@ -254,24 +251,39 @@
         currentResultsData = [];
         let zoomBounds = L.latLngBounds();
 
-        ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'].forEach(id => {
+        // Aplicar simbología de selección del código recuperado
+        const allKeys = [sectorLayerKey, 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
+
+        allKeys.forEach(id => {
             if (!geoLayers[id]) return;
             geoLayers[id].eachLayer(l => {
                 const p = l.feature.properties;
-                const match = lot ? (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot) 
-                                  : (p.cod_sector == sec && p.cod_mzna == mzn);
-                if (match) {
-                    l.setStyle({ opacity: 1, fillOpacity: 0.2 }); 
-                    currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
-                    if (l.getBounds) zoomBounds.extend(l.getBounds());
-                    else zoomBounds.extend(l.getLatLng());
-                } else l.setStyle({ opacity: 0, fillOpacity: 0 });
+                const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
+                const isMznMatch = (p.cod_sector == sec && p.cod_mzna == mzn);
+
+                if (id === 'tg_lote') {
+                    if (isMznMatch) {
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // Estilo recuperado: sin fondo para ver ortofoto
+                        if (isExactLote || !lot) { // Si hay lote exacto o solo filtramos manzana
+                            currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
+                            zoomBounds.extend(l.getBounds());
+                        }
+                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
+                } else if (id !== sectorLayerKey) {
+                    if (isExactLote) {
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
+                        if (l.getBounds) zoomBounds.extend(l.getBounds());
+                        else zoomBounds.extend(l.getLatLng());
+                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
+                }
             });
         });
 
         if (zoomBounds.isValid()) {
             map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 21 });
             if(lot) updateResultsUI();
+            highlightBorders(currentResultsData.map(d => d.obj)); // Activa el borde celeste
             refreshLabels(); 
         }
     }
@@ -281,7 +293,6 @@
         const zoom = map.getZoom();
         if (zoom < 16 || !sMzn.value) return;
         
-        // Etiqueta Manzana Azul/Blanco
         geoLayers['tg_manzana'].eachLayer(group => {
             group.eachLayer(l => {
                 if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) {
@@ -340,6 +351,17 @@
     sMzn.onchange = () => { updateLotes(); executeFinalFilter(); };
     sLot.onchange = () => executeFinalFilter();
 
+    function highlightBorders(objs) {
+        highlightLayer.clearLayers();
+        objs.forEach(o => {
+            const clone = L.geoJSON(o.feature, {
+                style: { color: '#00FFFF', weight: 4, fillOpacity: 0, opacity: 1, radius: 8 },
+                pointToLayer: (f, latlng) => L.circleMarker(latlng)
+            });
+            highlightLayer.addLayer(clone);
+        });
+    }
+
     function resetFilters() {
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
         closeResults();
@@ -350,7 +372,7 @@
             });
         }
         ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'].forEach(k => { if (geoLayers[k]) map.removeLayer(geoLayers[k]); });
-        if(geoLayers['tg_sector']) map.fitBounds(geoLayers['tg_sector'].getBounds());
+        if(geoLayers[sectorLayerKey]) map.fitBounds(geoLayers[sectorLayerKey].getBounds());
         handleLabelsVisibility();
     }
 
@@ -362,8 +384,8 @@
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
-            if(e.target.checked) { if(id === 'tg_sector') handleLabelsVisibility(); else map.addLayer(geoLayers[id]); }
-            else { if(id === 'tg_sector') map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); }
+            if(e.target.checked) { if(id === sectorLayerKey) handleLabelsVisibility(); else map.addLayer(geoLayers[id]); }
+            else { if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); }
             refreshLabels();
         };
         list.appendChild(div);
@@ -390,17 +412,6 @@
         });
         content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
         panel.style.display = 'flex';
-    }
-
-    function highlightBorders(objs) {
-        highlightLayer.clearLayers();
-        objs.forEach(o => {
-            const clone = L.geoJSON(o.feature, {
-                style: { color: '#00FFFF', weight: 4, fillOpacity: 0, opacity: 1, radius: 8 },
-                pointToLayer: (f, latlng) => L.circleMarker(latlng)
-            });
-            highlightLayer.addLayer(clone);
-        });
     }
 
     function zoomToFid(layerId, fidValue) {
