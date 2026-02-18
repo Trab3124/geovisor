@@ -276,14 +276,16 @@
             });
         });
 
-        // --- LÓGICA DE ORDENAMIENTO POR PISO ---
+        // --- LÓGICA DE ORDENAMIENTO REFORZADA ---
         currentResultsData.sort((a, b) => {
             if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
-                const pisoA = parseInt(a.props.piso) || 0;
-                const pisoB = parseInt(b.props.piso) || 0;
+                // Convertimos el campo 'piso' a número limpiando cualquier texto no numérico
+                const pisoA = parseInt(String(a.props.piso).replace(/\D/g, '')) || 0;
+                const pisoB = parseInt(String(b.props.piso).replace(/\D/g, '')) || 0;
                 return pisoA - pisoB;
             }
-            return 0;
+            // Mantiene el orden de capas (Lote -> Edifica -> Construcción -> Puerta)
+            return a.layer.localeCompare(b.layer);
         });
 
         if (zoomBounds.isValid()) {
