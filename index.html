@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Filtro y Etiquetas</title>
+    <title>Geovisor Catastral Pro - Ortofoto</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -45,7 +45,6 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        /* Estilos de Etiquetas */
         .label-mzna {
             font-size: 12px; font-weight: bold; color: #2563eb;
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
@@ -104,27 +103,29 @@
 </div>
 
 <script>
-    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 16);
+    // 1. MAPA (Centrado inicialmente para ver la ortofoto)
+    var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // --- CAPAS BASE ---
+    // 2. CAPAS BASE
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 }).addTo(map);
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
     
-    // ORTOIMAGEN INTEGRADA (Configurada para evitar el blanco)
-    var ortoimagen = L.tileLayer('ortofoto/{z}/{x}/{y}.jpg', {
+    // ORTOIMAGEN (Ruta relativa corregida para GitHub)
+    var ortoimagen = L.tileLayer('./ortofoto/{z}/{x}/{y}.jpg', {
+        minZoom: 17,          // Solo se activa cuando estás cerca (niveles 18, 19, 20)
         maxZoom: 24,           
-        maxNativeZoom: 20,     // Zoom real de tus teselas JPG
+        maxNativeZoom: 20,     
         attribution: 'Ortofoto Propia'
-    });
+    }).addTo(map); // Se añade al mapa para que sea visible por defecto
 
-    // Control de capas actualizado
     L.control.layers({
         "Callejero": osm, 
         "Satelital": sat,
         "Ortoimagen": ortoimagen
     }, null, {position: 'topright'}).addTo(map);
 
+    // 3. CAPAS VECTORIALES
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
         'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
@@ -143,7 +144,7 @@
     async function init() {
         for (let id of layerKeys) {
             try {
-                const res = await fetch(`data/${id}.geojson`);
+                const res = await fetch(`./data/${id}.geojson`);
                 const data = await res.json();
                 geoLayers[id] = L.geoJSON(data, {
                     style: styles[id],
@@ -266,15 +267,6 @@
         const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
-        data.sort((a, b) => {
-            if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
-                return (a.props.piso || "").localeCompare(b.props.piso || "", undefined, {numeric: true});
-            }
-            if (a.layer === 'TG_PUERTA' && b.layer === 'TG_PUERTA') {
-                return parseInt(a.props.orden || 0) - parseInt(b.props.orden || 0);
-            }
-            return 0;
-        });
         data.forEach((item) => {
             let badge = '';
             if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
@@ -357,7 +349,7 @@
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => l.setStyle(styles[id]));
         }
-        map.setView([-12.046, -77.042], 16);
+        map.setView([-12.046, -77.042], 18);
     }
 
     function closeResults() {
