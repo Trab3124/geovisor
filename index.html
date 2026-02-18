@@ -107,14 +107,9 @@
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 2. CAPAS BASE (Aquí agregamos las opciones de mapa base)
+    // 2. CAPAS BASE (MAPAS DE FONDO Y ORTOIMAGEN)
     var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 }).addTo(map);
-    
-    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
-        maxZoom: 24, 
-        maxNativeZoom: 19,
-        attribution: 'Esri'
-    });
+    var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 24, maxNativeZoom: 19 });
     
     var ortoimagen = L.tileLayer('./ortofoto/{z}/{x}/{y}.jpg', {
         minZoom: 17,
@@ -123,15 +118,15 @@
         attribution: 'Ortofoto Propia'
     }).addTo(map);
 
-    // Agregamos el selector de mapas base
+    // Control para alternar Mapas Base
     var baseMaps = {
-        "Callejero (OSM)": osm,
-        "Satelital (Esri)": sat,
+        "Open Street Map": osm,
+        "Satélite": sat,
         "Ortoimagen": ortoimagen
     };
     L.control.layers(baseMaps, null, {position: 'topright'}).addTo(map);
 
-    // 3. CAPAS VECTORIALES (Tu estilo original)
+    // 3. CAPAS VECTORIALES
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
         'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
@@ -303,11 +298,18 @@
         });
     }
 
+    // --- AQUÍ ESTÁN LOS CAMBIOS DE SELECCIÓN ---
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
             const clone = L.geoJSON(o.feature, {
-                style: { color: 'yellow', weight: 6, fillOpacity: 0, opacity: 1, radius: 8 },
+                style: { 
+                    color: '#00FFFF', // Color CIAN
+                    weight: 4,        // Grosor intermedio
+                    fillOpacity: 0,   // SIN FONDO (transparente)
+                    opacity: 1, 
+                    radius: 8 
+                },
                 pointToLayer: (f, latlng) => L.circleMarker(latlng)
             });
             highlightLayer.addLayer(clone);
