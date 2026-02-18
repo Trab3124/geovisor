@@ -59,7 +59,6 @@
             text-shadow: 1px 1px 0px #fff, -1px -1px 0px #fff, 1px -1px 0px #fff, -1px 1px 0px #fff;
             background: none; border: none; box-shadow: none;
         }
-        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -80,6 +79,7 @@
                 <option value="TG_LOTE">Lotes</option>
                 <option value="TG_EDIFICA">Edificas</option>
                 <option value="TG_CONSTRUCCION">Construcciones</option>
+                <option value="TG_CONSTRUCCION_2">Construcciones 2</option>
                 <option value="TG_PUERTA">Puertas</option>
             </select>
             <span class="close-btn" onclick="closeResults()">&times;</span>
@@ -121,7 +121,6 @@
 
     const BASE_PATH = './data';
     const sectorLayerKey = 'tg_sector';
-    const detailLayerKeys = ['tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
 
     const styles = {
         'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: true },
@@ -129,6 +128,7 @@
         'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
         'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
+        'tg_construccion_2': { color: "#ea580c", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
         'tg_puerta': { radius: 2.5, fillColor: "#000", color: "#fff", weight: 0.5, fillOpacity: 1, opacity: 1, interactive: false }
     };
 
@@ -177,22 +177,18 @@
             map.fitBounds(geoLayers[sectorLayerKey].getBounds());
             handleLabelsVisibility();
         } catch(e) {}
-        
         map.on('zoomend', handleLabelsVisibility);
     }
 
     function handleLabelsVisibility() {
         const zoom = map.getZoom();
-        if (zoom > 17) {
-            if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels);
-        } else {
-            if(document.getElementById('chk-tg_sector') && document.getElementById('chk-tg_sector').checked) map.addLayer(sectorLabels);
-        }
+        if (zoom > 17) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); }
+        else { if(document.getElementById('chk-tg_sector')?.checked) map.addLayer(sectorLabels); }
         refreshLabels();
     }
 
     async function loadSectorDetail(sectorId) {
-        const keysToClear = ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
+        const keysToClear = ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_construccion_2', 'tg_puerta'];
         keysToClear.forEach(key => { if (geoLayers[key]) map.removeLayer(geoLayers[key]); });
         const folder = `${BASE_PATH}/sector_${sectorId.padStart(2, '0')}`;
         for (let key of keysToClear) {
@@ -241,14 +237,11 @@
         const sec = sSec.value, mzn = sMzn.value, lot = sLot.value;
         if(!mzn) return;
 
-        geoLayers['tg_manzana'].eachLayer(group => {
-            group.eachLayer(l => l.setStyle({ opacity: 0, fillOpacity: 0 }));
-        });
+        geoLayers['tg_manzana'].eachLayer(group => { group.eachLayer(l => l.setStyle({ opacity: 0, fillOpacity: 0 })); });
 
         currentResultsData = [];
         let zoomBounds = L.latLngBounds();
-
-        const allKeys = [sectorLayerKey, 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
+        const allKeys = [sectorLayerKey, 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_construccion_2', 'tg_puerta'];
 
         allKeys.forEach(id => {
             if (!geoLayers[id]) return;
@@ -264,40 +257,32 @@
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
                         }
-                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
+                    } else l.setStyle({ opacity: 0, fillOpacity: 0 });
                 } else if (id !== sectorLayerKey) {
                     if (isExactLote) {
                         l.setStyle({ opacity: 1, fillOpacity: 0 }); 
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
                         else zoomBounds.extend(l.getLatLng());
-                    } else { l.setStyle({ opacity: 0, fillOpacity: 0 }); }
+                    } else l.setStyle({ opacity: 0, fillOpacity: 0 });
                 }
             });
         });
 
-        // --- LÓGICA DE ORDENAMIENTO JERÁRQUICO Y NUMÉRICO MEJORADA ---
-        const layerOrder = { 'TG_LOTE': 1, 'TG_EDIFICA': 2, 'TG_CONSTRUCCION': 3, 'TG_PUERTA': 4 };
+        const layerOrder = { 'TG_LOTE': 1, 'TG_EDIFICA': 2, 'TG_CONSTRUCCION': 3, 'TG_CONSTRUCCION_2': 4, 'TG_PUERTA': 5 };
 
         currentResultsData.sort((a, b) => {
-            // 1. Ordenar por tipo de capa
-            if (layerOrder[a.layer] !== layerOrder[b.layer]) {
-                return layerOrder[a.layer] - layerOrder[b.layer];
+            if (layerOrder[a.layer] !== layerOrder[b.layer]) return layerOrder[a.layer] - layerOrder[b.layer];
+            if (a.layer === 'TG_CONSTRUCCION' || a.layer === 'TG_CONSTRUCCION_2') {
+                const pA = parseInt(String(a.props.piso).replace(/\D/g, '')) || 0;
+                const pB = parseInt(String(b.props.piso).replace(/\D/g, '')) || 0;
+                return pA - pB;
             }
-
-            // 2. Si son de la misma capa, ordenar numéricamente
-            if (a.layer === 'TG_CONSTRUCCION') {
-                const pisoA = parseInt(String(a.props.piso).replace(/\D/g, '')) || 0;
-                const pisoB = parseInt(String(b.props.piso).replace(/\D/g, '')) || 0;
-                return pisoA - pisoB;
-            }
-            
             if (a.layer === 'TG_PUERTA') {
-                const ordenA = parseInt(String(a.props.orden).replace(/\D/g, '')) || 0;
-                const ordenB = parseInt(String(b.props.orden).replace(/\D/g, '')) || 0;
-                return ordenA - ordenB;
+                const oA = parseInt(String(a.props.orden).replace(/\D/g, '')) || 0;
+                const oB = parseInt(String(b.props.orden).replace(/\D/g, '')) || 0;
+                return oA - oB;
             }
-
             return 0;
         });
 
@@ -313,25 +298,17 @@
         labelLayer.clearLayers();
         const zoom = map.getZoom();
         if (zoom < 16 || !sMzn.value) return;
-        
         geoLayers['tg_manzana'].eachLayer(group => {
             group.eachLayer(l => {
                 if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) {
-                    L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }),
-                        interactive: false
-                    }).addTo(labelLayer);
+                    L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }), interactive: false }).addTo(labelLayer);
                 }
             });
         });
-
         if (zoom >= 19 && geoLayers['tg_lote']) {
             geoLayers['tg_lote'].eachLayer(l => {
                 if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) {
-                    L.marker(l.getBounds().getCenter(), {
-                        icon: L.divIcon({ className: 'label-lote', html: l.feature.properties.cod_lote }),
-                        interactive: false
-                    }).addTo(labelLayer);
+                    L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-lote', html: l.feature.properties.cod_lote }), interactive: false }).addTo(labelLayer);
                 }
             });
         }
@@ -349,9 +326,7 @@
         sMzn.disabled = !sSec.value;
         if(sSec.value && geoLayers['tg_manzana']) {
             let list = [];
-            geoLayers['tg_manzana'].eachLayer(group => {
-                group.eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value) list.push(l.feature.properties.cod_mzna); });
-            });
+            geoLayers['tg_manzana'].eachLayer(group => { group.eachLayer(l => { if(l.feature.properties.cod_sector == sSec.value) list.push(l.feature.properties.cod_mzna); }); });
             [...new Set(list)].sort().forEach(m => sMzn.innerHTML += `<option value="${m}">${m}</option>`);
         }
         if(callback) callback();
@@ -375,32 +350,23 @@
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
-            const clone = L.geoJSON(o.feature, {
-                style: { color: '#00FFFF', weight: 4, fillOpacity: 0, opacity: 1, radius: 8 },
-                pointToLayer: (f, latlng) => L.circleMarker(latlng)
-            });
+            const clone = L.geoJSON(o.feature, { style: { color: '#00FFFF', weight: 4, fillOpacity: 0, opacity: 1, radius: 8 }, pointToLayer: (f, latlng) => L.circleMarker(latlng) });
             highlightLayer.addLayer(clone);
         });
     }
 
     function resetFilters() {
         sSec.value = ""; sMzn.disabled = true; sLot.disabled = true;
-        closeResults();
-        labelLayer.clearLayers();
-        if(geoLayers['tg_manzana']) {
-            geoLayers['tg_manzana'].eachLayer(group => {
-                group.eachLayer(l => l.setStyle(styles['tg_manzana']));
-            });
-        }
-        ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'].forEach(k => { if (geoLayers[k]) map.removeLayer(geoLayers[k]); });
+        closeResults(); labelLayer.clearLayers();
+        if(geoLayers['tg_manzana']) geoLayers['tg_manzana'].eachLayer(group => { group.eachLayer(l => l.setStyle(styles['tg_manzana'])); });
+        ['tg_lote', 'tg_edifica', 'tg_construccion', 'tg_construccion_2', 'tg_puerta'].forEach(k => { if (geoLayers[k]) map.removeLayer(geoLayers[k]); });
         if(geoLayers[sectorLayerKey]) map.fitBounds(geoLayers[sectorLayerKey].getBounds());
         handleLabelsVisibility();
     }
 
     function addLayerCheckbox(id) {
         if(document.getElementById(`chk-${id}`)) return;
-        const list = document.getElementById('layer-list');
-        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificas', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
+        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificas', tg_construccion:'Construcciones', tg_construccion_2:'Construcciones 2', tg_puerta:'Puertas'};
         const div = document.createElement('div');
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
@@ -409,22 +375,22 @@
             else { if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); }
             refreshLabels();
         };
-        list.appendChild(div);
+        document.getElementById('layer-list').appendChild(div);
     }
 
     function updateResultsUI() {
         const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
-        const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
         
         data.forEach((item) => {
             let badge = '';
+            const labelsMap = { 'TG_LOTE': 'LOTE', 'TG_EDIFICA': 'EDIFICA', 'TG_CONSTRUCCION': 'CONSTRUCCIÓN', 'TG_CONSTRUCCION_2': 'CONSTRUCCIÓN 2', 'TG_PUERTA': 'PUERTA' };
             if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
-            else if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+            else if ((item.layer === 'TG_CONSTRUCCION' || item.layer === 'TG_CONSTRUCCION_2') && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
             
-            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;"><span>CAPA: ${item.layer}</span>${badge}</div>`;
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;"><span>CAPA: ${labelsMap[item.layer]}</span>${badge}</div>`;
             html += `<table>`;
             for (let key in item.props) {
                 let val = item.props[key];
@@ -434,7 +400,7 @@
             html += `</table>`;
         });
         content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
-        panel.style.display = 'flex';
+        document.getElementById('results-panel').style.display = 'flex';
     }
 
     function zoomToFid(layerId, fidValue) {
