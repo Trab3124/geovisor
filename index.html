@@ -44,7 +44,6 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        /* ETIQUETAS */
         .label-sector {
             font-size: 18px; font-weight: bold; color: #1e40af;
             text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200, 0 2px 0 #fff200, 0 -2px 0 #fff200, 2px 0 0 #fff200, -2px 0 0 #fff200;
@@ -172,12 +171,12 @@
                                 l.on('click', (e) => { L.DomEvent.stopPropagation(e); autoFilterByManzana(f.properties); });
                             }
                         }).addTo(geoLayers['tg_manzana']);
-                    }).catch(e => console.warn(`Error sector ${sId}`));
+                    }).catch(e => {});
             }
 
             map.fitBounds(geoLayers[sectorLayerKey].getBounds());
             handleLabelsVisibility();
-        } catch(e) { console.error("Error init", e); }
+        } catch(e) {}
         
         map.on('zoomend', handleLabelsVisibility);
     }
@@ -238,12 +237,10 @@
         });
     }
 
-    // --- LÓGICA DE SELECCIÓN JERÁRQUICA RECUPERADA ---
     function executeFinalFilter() {
         const sec = sSec.value, mzn = sMzn.value, lot = sLot.value;
         if(!mzn) return;
 
-        // Ocultar geometría de manzana
         geoLayers['tg_manzana'].eachLayer(group => {
             group.eachLayer(l => l.setStyle({ opacity: 0, fillOpacity: 0 }));
         });
@@ -251,7 +248,6 @@
         currentResultsData = [];
         let zoomBounds = L.latLngBounds();
 
-        // Aplicar simbología de selección del código recuperado
         const allKeys = [sectorLayerKey, 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
 
         allKeys.forEach(id => {
@@ -263,8 +259,8 @@
 
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // Estilo recuperado: sin fondo para ver ortofoto
-                        if (isExactLote || !lot) { // Si hay lote exacto o solo filtramos manzana
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        if (isExactLote || !lot) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
                         }
@@ -280,10 +276,20 @@
             });
         });
 
+        // --- LÓGICA DE ORDENAMIENTO POR PISO ---
+        currentResultsData.sort((a, b) => {
+            if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
+                const pisoA = parseInt(a.props.piso) || 0;
+                const pisoB = parseInt(b.props.piso) || 0;
+                return pisoA - pisoB;
+            }
+            return 0;
+        });
+
         if (zoomBounds.isValid()) {
             map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 21 });
             if(lot) updateResultsUI();
-            highlightBorders(currentResultsData.map(d => d.obj)); // Activa el borde celeste
+            highlightBorders(currentResultsData.map(d => d.obj));
             refreshLabels(); 
         }
     }
@@ -397,10 +403,12 @@
         const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
+        
         data.forEach((item) => {
             let badge = '';
             if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
             else if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+            
             html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;"><span>CAPA: ${item.layer}</span>${badge}</div>`;
             html += `<table>`;
             for (let key in item.props) {
