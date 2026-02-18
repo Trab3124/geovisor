@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "uca",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-15,
+"features": [
+{ "type": "Feature", "properties": { "fid": 8, "cod_sector": "22", "cod_mzna": "017", "cod_lote": "021", "USO": "VIVIENDA", "cod_piso": "01", "area": 4.66, "categoria": "CF", "ubigeo": "150112", "tg_invasio": "SI", "cod_edific": "01" }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -77.037440464462307, -11.975550140345693 ], [ -77.037491783949861, -11.975565199787189 ], [ -77.03749375725647, -11.975558234792137 ], [ -77.037442495868234, -11.975543192148704 ], [ -77.037440464462307, -11.975550140345693 ] ] ] ] } }
+]
+}

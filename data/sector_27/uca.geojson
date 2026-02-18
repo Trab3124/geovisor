@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "UCA",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-15,
+"features": [
+{ "type": "Feature", "properties": { "fid": 2, "cod_sector": "27", "cod_mzna": "014", "cod_lote": "001", "USO": "VIVIENDA", "cod_piso": "03", "cod_edific": "02", "tg_invasio": "SI", "categoria": "CC", "ubigeo": "150112", "area": 0.44 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -77.054846393135037, -11.987914345904986 ], [ -77.0548487794224, -11.987916924857883 ], [ -77.054858708132002, -11.987913192349188 ], [ -77.054857531478916, -11.987910158657424 ], [ -77.054846393135037, -11.987914345904986 ] ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 3, "cod_sector": "27", "cod_mzna": "014", "cod_lote": "001", "USO": "VIVIENDA", "cod_piso": "04", "cod_edific": "02", "tg_invasio": "SI", "categoria": "CC", "ubigeo": "150112", "area": 0.44 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -77.054846393135037, -11.987914345904986 ], [ -77.0548487794224, -11.987916924857883 ], [ -77.054858708132002, -11.987913192349188 ], [ -77.054857531478916, -11.987910158657424 ], [ -77.054846393135037, -11.987914345904986 ] ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 4, "cod_sector": "27", "cod_mzna": "014", "cod_lote": "001", "USO": "VIVIENDA", "cod_piso": "02", "cod_edific": "02", "tg_invasio": "SI", "categoria": "CC", "ubigeo": "150112", "area": 0.44 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -77.054846393135037, -11.987914345904986 ], [ -77.0548487794224, -11.987916924857883 ], [ -77.054858708132002, -11.987913192349188 ], [ -77.054857531478916, -11.987910158657424 ], [ -77.054846393135037, -11.987914345904986 ] ] ] ] } },
+{ "type": "Feature", "properties": { "fid": 5, "cod_sector": "27", "cod_mzna": "022", "cod_lote": "003", "USO": "VIVIENDA", "cod_piso": "01", "cod_edific": "01", "tg_invasio": null, "categoria": null, "ubigeo": "150112", "area": 10.47 }, "geometry": { "type": "MultiPolygon", "coordinates": [ [ [ [ -77.054667845776294, -11.98858241688902 ], [ -77.054646694322471, -11.988555102579809 ], [ -77.054626776509224, -11.988569414090563 ], [ -77.054646884061427, -11.988597478473874 ], [ -77.054667845776294, -11.98858241688902 ] ] ] ] } }
+]
+}
