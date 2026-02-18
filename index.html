@@ -2,14 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="utf-8" />
-    <title>Geovisor Catastral Pro - Ortofoto & Selección</title>
+    <title>Geovisor Catastral Pro - Ortofoto</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { margin:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; overflow: hidden; }
+        body { margin:0; font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; overflow: hidden; }
         header {
             background: #1e40af; color: white; padding: 0 20px; font-size: 18px; font-weight: bold;
             display: flex; align-items: center; height: 55px; z-index: 1001; position: relative;
@@ -23,32 +23,36 @@
         }
         .panel { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         
-        #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; max-height: 400px; }
+        #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; max-height: 450px; }
         .scroll-area { overflow-y: auto; flex-grow: 1; margin-top: 10px; }
 
-        #search-panel { position: absolute; right: 10px; top: 160px; width: 280px; z-index: 1000; }
+        #search-panel { position: absolute; right: 10px; top: 120px; width: 280px; z-index: 1000; }
 
         h3 { margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .results-header-flex { display: flex; align-items: center; justify-content: space-between; gap:5px; }
         
         table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 12px; border: 1px solid #cbd5e1; }
         td { border: 1px solid #e2e8f0; padding: 6px; }
         .attr-key { font-weight: bold; background: #f8fafc; color: #475569; width: 35%; }
         
+        .fid-link { color: #2563eb; text-decoration: underline; cursor: pointer; font-weight: bold; }
         .order-badge { background: #1e40af; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+
         select { width: 100%; padding: 7px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; margin-top: 4px; }
         label { font-size: 11px; font-weight: bold; color: #64748b; }
         .btn-reset { width: 100%; padding: 8px; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; font-weight: bold; }
         
-        .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1px 1px 1px #fff; background:none; border:none; box-shadow:none; }
-        .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 1px #fff; background:none; border:none; box-shadow:none; }
+        .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
+        .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        /* Ajuste para el control de capas */
-        .leaflet-control-layers { border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important; padding: 10px !important; }
+        .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1px 1px 1px #fff; background: none; border: none; box-shadow: none; }
+        .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 1px #fff; background: none; border: none; box-shadow: none; }
+        .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
 <body>
 
-<header>SISTEMA CATASTRAL DINÁMICO</header>
+<header>Geovisor de Avance Catastral</header>
 <div id="map"></div>
 
 <div class="sidebar-left">
@@ -57,16 +61,23 @@
         <div id="layer-list"></div>
     </div>
     <div id="results-panel" class="panel">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0">Información</h3>
-            <span style="cursor:pointer; font-weight:bold; color:red;" onclick="resetFilters()">×</span>
+        <div class="results-header-flex">
+            <h3 style="margin:0">Resultados</h3>
+            <select id="filter-layer-results" onchange="updateResultsUI()" style="width:130px; margin:0">
+                <option value="ALL">Ver Todas</option>
+                <option value="TG_LOTE">Lotes</option>
+                <option value="TG_EDIFICA">Edificios</option>
+                <option value="TG_CONSTRUCCION">Construcciones</option>
+                <option value="TG_PUERTA">Puertas</option>
+            </select>
+            <span class="close-btn" onclick="resetFilters()">&times;</span>
         </div>
         <div id="results-content" class="scroll-area"></div>
     </div>
 </div>
 
 <div id="search-panel" class="panel">
-    <h3>Búsqueda de Predios</h3>
+    <h3>Búsqueda Jerárquica</h3>
     <div style="margin-bottom:8px">
         <label>Sector</label>
         <select id="sel-sector"><option value="">Seleccione...</option></select>
@@ -79,7 +90,7 @@
         <label>Lote</label>
         <select id="sel-lote" disabled><option value="">Seleccione...</option></select>
     </div>
-    <button class="btn-reset" onclick="resetFilters()">Limpiar Vista</button>
+    <button class="btn-reset" onclick="resetFilters()">Limpiar Filtros</button>
 </div>
 
 <script>
@@ -87,36 +98,38 @@
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 2. DEFINICIÓN DE MAPAS BASE
-    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-        maxZoom: 24, maxNativeZoom: 19 
-    });
-
+    // 2. CONFIGURACIÓN DE CAPAS BASE (MAPAS DE FONDO)
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 });
     var satelital = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
-        maxZoom: 24, maxNativeZoom: 19 
+        maxZoom: 24, 
+        maxNativeZoom: 19,
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
     });
-
-    var ortoimagen = L.tileLayer('./ortofoto/{z}/{x}/{y}.jpg', {
-        minZoom: 14, maxZoom: 24, maxNativeZoom: 20,
+    
+    var ortofoto = L.tileLayer('./ortofoto/{z}/{x}/{y}.jpg', {
+        minZoom: 14,
+        maxZoom: 24,           
+        maxNativeZoom: 20,     
         attribution: 'Ortofoto Propia'
-    }).addTo(map); // Activa por defecto
+    }).addTo(map); // Por defecto se muestra la ortofoto
 
+    // Control de selección de mapas base
     var baseMaps = {
-        "Open Street Map": osm,
-        "Imagen Satelital": satelital,
-        "Mi Ortoimagen": ortoimagen
+        "Mi Ortoimagen": ortofoto,
+        "Satelital (ESRI)": satelital,
+        "Callejero (OSM)": osm
     };
+    L.control.layers(baseMaps, null, {position: 'topright', collapsed: false}).addTo(map);
 
-    L.control.layers(baseMaps, null, { collapsed: false, position: 'topright' }).addTo(map);
-
-    // 3. ESTILOS DE CAPAS VECTORIALES (Sin fondo para ver la ortofoto)
+    // 3. CAPAS VECTORIALES CON ESTILO TRANSPARENTE
+    const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
-        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1 },
-        'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1 },
-        'tg_lote': { color: "#16a34a", weight: 1.2, fillOpacity: 0.05, opacity: 1, interactive: true },
-        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.1, opacity: 1 },
-        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.1, opacity: 1 },
-        'tg_puerta': { radius: 4, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1 }
+        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
+        'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1, interactive: false },
+        'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.05, opacity: 1, interactive: true },
+        'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.1, opacity: 1, interactive: false },
+        'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.1, opacity: 1, interactive: false },
+        'tg_puerta': { radius: 4, fillColor: "#000", color: "#fff", weight: 1, fillOpacity: 1, opacity: 1, interactive: false }
     };
 
     let geoLayers = {};
@@ -125,7 +138,6 @@
     let labelLayer = L.layerGroup().addTo(map);
 
     async function init() {
-        const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
         for (let id of layerKeys) {
             try {
                 const res = await fetch(`./data/${id}.geojson`);
@@ -144,29 +156,35 @@
                 }).addTo(map);
                 addLayerCheckbox(id);
                 if(id === 'tg_sector') populateSectors(data);
-            } catch(e) { console.warn("Falta capa: " + id); }
+            } catch(e) { console.warn("Error cargando " + id); }
         }
         map.on('zoomend', refreshLabels);
     }
 
-    // 4. FUNCIÓN DE RESALTADO (CIAN DELGADO SIN FONDO)
+    // 4. SELECCIÓN GRÁFICA COLOR CIAN SIN FONDO
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
             const clone = L.geoJSON(o.feature, {
                 style: { 
-                    color: '#00FFFF', // Color Cian
-                    weight: 2.5,      // Delgado
-                    fillOpacity: 0,   // Sin fondo
+                    color: '#00FFFF', // Cian
+                    weight: 3.5,      // Borde notable
+                    fillOpacity: 0,   // Sin fondo para ver la ortofoto
                     opacity: 1 
                 },
-                pointToLayer: (f, latlng) => L.circleMarker(latlng, { radius: 6, color: '#00FFFF', fill: false })
+                pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+                    radius: 7,
+                    color: '#00FFFF',
+                    fillOpacity: 0,
+                    weight: 3
+                })
             });
             highlightLayer.addLayer(clone);
         });
     }
 
-    // 5. FILTRADO Y LÓGICA
+    // --- Lógica de Filtros (Igual a tu código base pero con el estilo cian) ---
+
     function autoFilterByLote(props) {
         sSec.value = props.cod_sector;
         updateManzanas(() => {
@@ -187,49 +205,52 @@
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => {
                 const p = l.feature.properties;
+                const isMatch = (p.cod_sector == sec && p.cod_mzna == mzn && (id === 'tg_lote' ? true : p.cod_lote == lot));
                 const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
-                
-                if (isExactLote) {
-                    l.setStyle({ opacity: 1, weight: 2 });
-                    currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
-                    if (l.getBounds) zoomBounds.extend(l.getBounds());
-                    else zoomBounds.extend(l.getLatLng());
+
+                if (isExactLote || (id === 'tg_lote' && isMatch)) {
+                    l.setStyle({ opacity: 1, fillOpacity: styles[id].fillOpacity });
+                    if (isExactLote) {
+                        currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
+                        if (l.getBounds) zoomBounds.extend(l.getBounds());
+                        else zoomBounds.extend(l.getLatLng());
+                    }
                 } else {
-                    l.setStyle({ opacity: 0.1, fillOpacity: 0 }); // Atenuar otros predios
+                    l.setStyle({ opacity: 0.1, fillOpacity: 0 }); // Atenuamos los demás
                 }
             });
         }
-        
         if (currentResultsData.length > 0) {
-            map.fitBounds(zoomBounds, { padding: [50, 50], maxZoom: 21 });
+            map.fitBounds(zoomBounds, { padding: [40, 40], maxZoom: 21 });
             updateResultsUI();
             highlightBorders(currentResultsData.map(d => d.obj));
             refreshLabels();
         }
     }
 
-    function updateResultsUI() {
-        const content = document.getElementById('results-content');
-        const panel = document.getElementById('results-panel');
-        let html = "";
-        currentResultsData.forEach((item) => {
-            html += `<div style="background:#f8fafc; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #00FFFF; margin-top:5px;">${item.layer}</div>`;
-            html += `<table>`;
-            for (let key in item.props) {
-                html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || '-'}</td></tr>`;
+    function refreshLabels() {
+        labelLayer.clearLayers();
+        const zoom = map.getZoom();
+        const sec = sSec.value, mzn = sMzn.value;
+        if (!mzn || zoom < 17) return;
+        
+        geoLayers['tg_lote'].eachLayer(l => {
+            const p = l.feature.properties;
+            if (p.cod_mzna === mzn && p.cod_sector === sec && zoom >= 19) {
+                L.marker(l.getBounds().getCenter(), {
+                    icon: L.divIcon({ className: 'label-lote', html: p.cod_lote }),
+                    interactive: false
+                }).addTo(labelLayer);
             }
-            html += `</table>`;
         });
-        content.innerHTML = html;
-        panel.style.display = 'flex';
     }
 
     function addLayerCheckbox(id) {
         const list = document.getElementById('layer-list');
-        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificios', tg_construccion:'Construc.', tg_puerta:'Puertas'};
+        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificios', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         const div = document.createElement('div');
-        div.style.fontSize = '12px';
-        div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> ${labels[id]}`;
+        div.className = 'layer-row';
+        div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
             if(e.target.checked) map.addLayer(geoLayers[id]);
             else map.removeLayer(geoLayers[id]);
@@ -237,20 +258,20 @@
         list.appendChild(div);
     }
 
-    function refreshLabels() {
-        labelLayer.clearLayers();
-        if (map.getZoom() < 18) return;
-        const sec = sSec.value, mzn = sMzn.value;
-        if (!mzn) return;
-        geoLayers['tg_lote'].eachLayer(l => {
-            const p = l.feature.properties;
-            if (p.cod_mzna === mzn && p.cod_sector === sec) {
-                L.marker(l.getBounds().getCenter(), {
-                    icon: L.divIcon({ className: 'label-lote', html: p.cod_lote }),
-                    interactive: false
-                }).addTo(labelLayer);
+    function updateResultsUI() {
+        const content = document.getElementById('results-content');
+        const panel = document.getElementById('results-panel');
+        let html = "";
+        currentResultsData.forEach((item) => {
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #00FFFF;">CAPA: ${item.layer}</div>`;
+            html += `<table>`;
+            for (let key in item.props) {
+                html += `<tr><td class="attr-key">${key}</td><td>${item.props[key] || '-'}</td></tr>`;
             }
+            html += `</table>`;
         });
+        content.innerHTML = html || "<p style='text-align:center; font-size:11px; color:gray;'>No hay datos.</p>";
+        panel.style.display = 'flex';
     }
 
     const sSec = document.getElementById('sel-sector'), sMzn = document.getElementById('sel-mzna'), sLot = document.getElementById('sel-lote');
@@ -262,6 +283,7 @@
 
     function updateManzanas(callback) {
         sMzn.innerHTML = '<option value="">Seleccione...</option>';
+        sLot.innerHTML = '<option value="">Seleccione...</option>';
         sMzn.disabled = !sSec.value;
         if(sSec.value) {
             let list = [];
@@ -301,4 +323,3 @@
 </script>
 </body>
 </html>
-
