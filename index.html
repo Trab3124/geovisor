@@ -103,11 +103,11 @@
 </div>
 
 <script>
-    // 1. MAPA (Cambio: Ahora Satelital es el fondo por defecto)
+    // 1. CONFIGURACIÓN DEL MAPA
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 2. CAPAS BASE
+    // 2. MAPAS BASE (Satélite por defecto)
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
         maxZoom: 24, maxNativeZoom: 19, attribution: 'Esri' 
     }).addTo(map);
@@ -116,7 +116,6 @@
         minZoom: 17, maxZoom: 24, maxNativeZoom: 20, attribution: 'Ortofoto Propia'
     }).addTo(map);
 
-    // Selector de mapas base (Solo Satelital y Ortofoto)
     L.control.layers({ "Satélite": sat, "Ortofoto": ortoimagen }, null, {position: 'topright'}).addTo(map);
 
     // 3. CAPAS VECTORIALES
@@ -184,8 +183,7 @@
 
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        // Cambiamos a fillOpacity: 0 para que no tenga fondo al filtrar
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // SIN FONDO
                         if (isExactLote) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
@@ -195,7 +193,7 @@
                     }
                 } else {
                     if (isExactLote) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // Sin fondo para otras capas también
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // SIN FONDO
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
                         else zoomBounds.extend(l.getLatLng());
@@ -213,7 +211,6 @@
         }
     }
 
-    // El resaltado de borde (ahora Cian como pediste antes, sin fondo)
     function highlightBorders(objs) {
         highlightLayer.clearLayers();
         objs.forEach(o => {
@@ -241,12 +238,23 @@
         const panel = document.getElementById('results-panel');
         let html = "";
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
+        
         data.forEach((item) => {
-            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af;">CAPA: ${item.layer}</div>`;
+            // RESTAURADO: Lógica de la etiqueta de ORDEN para puertas y PISO para construcción
+            let badge = '';
+            if (item.layer === 'TG_PUERTA' && item.props.orden) {
+                badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
+            } else if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) {
+                badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+            }
+
+            html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
+                        <span>CAPA: ${item.layer}</span>
+                        ${badge}
+                     </div>`;
             html += `<table>`;
             for (let key in item.props) {
                 let val = item.props[key];
-                // Restauramos el enlace del FID
                 if (key.toLowerCase() === 'fid') {
                     val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
                 }
@@ -258,7 +266,6 @@
         panel.style.display = 'flex';
     }
 
-    // Funciones auxiliares de carga y filtros (Sin cambios para no romper tu lógica)
     function refreshLabels() {
         labelLayer.clearLayers();
         const zoom = map.getZoom();
