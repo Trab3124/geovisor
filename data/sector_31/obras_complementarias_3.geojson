@@ -1,0 +1,25 @@
+{
+"type": "FeatureCollection",
+"name": "obras_complementarias_3",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-15,
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "tipo": "ESCALERA METALICA", "cod_mzna": "071", "cod_sector": "31", "UCA": "SI" }, "geometry": { "type": "Point", "coordinates": [ -77.042209128907302, -11.990462367127554 ] } },
+{ "type": "Feature", "properties": { "fid": 2, "tipo": "ESCALERA METALICA", "cod_mzna": "073", "cod_sector": "31", "UCA": "SI" }, "geometry": { "type": "Point", "coordinates": [ -77.04231222246878, -11.990920534309337 ] } },
+{ "type": "Feature", "properties": { "fid": 3, "tipo": "ESCALERA METALICA", "cod_mzna": "074", "cod_sector": "31", "UCA": "SI" }, "geometry": { "type": "Point", "coordinates": [ -77.041260310712957, -11.990551285349463 ] } },
+{ "type": "Feature", "properties": { "fid": 4, "tipo": "ESCALERA METALICA", "cod_mzna": "041", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.051841499998048, -11.993881248022637 ] } },
+{ "type": "Feature", "properties": { "fid": 5, "tipo": "ESCALERA METALICA", "cod_mzna": "044", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.0507461988757, -11.993022994372161 ] } },
+{ "type": "Feature", "properties": { "fid": 6, "tipo": "ESCALERA METALICA", "cod_mzna": "056", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.047316310681666, -11.99206894724046 ] } },
+{ "type": "Feature", "properties": { "fid": 7, "tipo": "ESCALERA METALICA", "cod_mzna": "060", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.044523398149707, -11.989918915872241 ] } },
+{ "type": "Feature", "properties": { "fid": 8, "tipo": "ESCALERA METALICA", "cod_mzna": "018", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.050112675867481, -11.991279777939409 ] } },
+{ "type": "Feature", "properties": { "fid": 9, "tipo": "POSTE", "cod_mzna": "017", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.050432462638625, -11.992120136580242 ] } },
+{ "type": "Feature", "properties": { "fid": 10, "tipo": "POSTE", "cod_mzna": "017", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.050511246927087, -11.991903048908538 ] } },
+{ "type": "Feature", "properties": { "fid": 11, "tipo": "POSTE", "cod_mzna": "017", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.050325297972606, -11.991837692659812 ] } },
+{ "type": "Feature", "properties": { "fid": 12, "tipo": "POSTE", "cod_mzna": "017", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.050242350193614, -11.992047062890117 ] } },
+{ "type": "Feature", "properties": { "fid": 13, "tipo": "ESCALERA METALICA", "cod_mzna": "021", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.046730844296548, -11.989414470060133 ] } },
+{ "type": "Feature", "properties": { "fid": 14, "tipo": "POSTE", "cod_mzna": "054", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.049934069816359, -11.993091664439321 ] } },
+{ "type": "Feature", "properties": { "fid": 15, "tipo": "POSTE", "cod_mzna": "054", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.049667385620921, -11.992998203085451 ] } },
+{ "type": "Feature", "properties": { "fid": 16, "tipo": "ESCALERA METALICA", "cod_mzna": "055", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.048890102763096, -11.992674984426673 ] } },
+{ "type": "Feature", "properties": { "fid": 17, "tipo": "ESCALERA METALICA", "cod_mzna": "006", "cod_sector": "31", "UCA": "NO" }, "geometry": { "type": "Point", "coordinates": [ -77.053292109866902, -11.992881792475167 ] } }
+]
+}
