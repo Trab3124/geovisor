@@ -276,16 +276,29 @@
             });
         });
 
-        // --- LÓGICA DE ORDENAMIENTO REFORZADA ---
+        // --- LÓGICA DE ORDENAMIENTO JERÁRQUICO Y NUMÉRICO MEJORADA ---
+        const layerOrder = { 'TG_LOTE': 1, 'TG_EDIFICA': 2, 'TG_CONSTRUCCION': 3, 'TG_PUERTA': 4 };
+
         currentResultsData.sort((a, b) => {
-            if (a.layer === 'TG_CONSTRUCCION' && b.layer === 'TG_CONSTRUCCION') {
-                // Convertimos el campo 'piso' a número limpiando cualquier texto no numérico
+            // 1. Ordenar por tipo de capa
+            if (layerOrder[a.layer] !== layerOrder[b.layer]) {
+                return layerOrder[a.layer] - layerOrder[b.layer];
+            }
+
+            // 2. Si son de la misma capa, ordenar numéricamente
+            if (a.layer === 'TG_CONSTRUCCION') {
                 const pisoA = parseInt(String(a.props.piso).replace(/\D/g, '')) || 0;
                 const pisoB = parseInt(String(b.props.piso).replace(/\D/g, '')) || 0;
                 return pisoA - pisoB;
             }
-            // Mantiene el orden de capas (Lote -> Edifica -> Construcción -> Puerta)
-            return a.layer.localeCompare(b.layer);
+            
+            if (a.layer === 'TG_PUERTA') {
+                const ordenA = parseInt(String(a.props.orden).replace(/\D/g, '')) || 0;
+                const ordenB = parseInt(String(b.props.orden).replace(/\D/g, '')) || 0;
+                return ordenA - ordenB;
+            }
+
+            return 0;
         });
 
         if (zoomBounds.isValid()) {
