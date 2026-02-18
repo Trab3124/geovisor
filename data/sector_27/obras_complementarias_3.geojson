@@ -1,0 +1,9 @@
+{
+"type": "FeatureCollection",
+"name": "obras_complementarias_3",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"xy_coordinate_resolution": 1e-15,
+"features": [
+{ "type": "Feature", "properties": { "fid": 19, "tipo": "ESCALERA METALICA", "cod_mzna": "020", "cod_sector": "27", "UCA": "NO", "layer": null }, "geometry": { "type": "Point", "coordinates": [ -77.055931481588431, -11.989229260668104 ] } }
+]
+}
