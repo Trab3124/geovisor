@@ -11,22 +11,22 @@
     <style>
         body { margin:0; font-family: Arial, sans-serif; background: #f1f5f9; overflow: hidden; }
         header {
-            background: #1e40af; color: white; padding: 0 20px; font-size: 18px; font-weight: bold;
-            display: flex; align-items: center; height: 55px; z-index: 1001; position: relative;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: #1e40af; color: white; padding: 0 20px; font-size: 16px; font-weight: normal;
+            display: flex; align-items: center; height: 40px; z-index: 1001; position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); font-family: Arial, sans-serif;
         }
-        #map { height: calc(100vh - 55px); width: 100%; background: #e5e7eb; cursor: crosshair; }
+        #map { height: calc(100vh - 40px); width: 100%; background: #e5e7eb; cursor: crosshair; }
 
         .sidebar-left {
-            position: absolute; top: 65px; left: 10px; width: 340px; z-index: 1000;
-            display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 80px);
+            position: absolute; top: 50px; left: 10px; width: 340px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 60px);
         }
         .panel { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         
         #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; max-height: 450px; }
         .scroll-area { overflow-y: auto; flex-grow: 1; margin-top: 10px; }
 
-        #search-panel { position: absolute; right: 10px; top: 65px; width: 280px; z-index: 1000; }
+        #search-panel { position: absolute; right: 10px; top: 50px; width: 280px; z-index: 1000; }
 
         h3 { margin: 0 0 10px 0; font-size: 13px; color: #1e40af; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .results-header-flex { display: flex; align-items: center; justify-content: space-between; gap:5px; }
@@ -74,7 +74,7 @@
             <select id="filter-layer-results" onchange="updateResultsUI()" style="width:130px; margin:0">
                 <option value="ALL">Ver Todas</option>
                 <option value="TG_LOTE">Lotes</option>
-                <option value="TG_EDIFICA">Edificios</option>
+                <option value="TG_EDIFICA">Edificas</option>
                 <option value="TG_CONSTRUCCION">Construcciones</option>
                 <option value="TG_PUERTA">Puertas</option>
             </select>
@@ -107,7 +107,7 @@
     var map = L.map('map', { zoomControl: false, maxZoom: 24 }).setView([-12.046, -77.042], 18);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // 2. MAPAS BASE (Satélite por defecto)
+    // 2. MAPAS BASE
     var sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
         maxZoom: 24, maxNativeZoom: 19, attribution: 'Esri' 
     }).addTo(map);
@@ -118,10 +118,10 @@
 
     L.control.layers({ "Satélite": sat, "Ortofoto": ortoimagen }, null, {position: 'topright'}).addTo(map);
 
-    // 3. CAPAS VECTORIALES
+    // 3. CAPAS VECTORIALES (Cambio: Sector ahora es Azul)
     const layerKeys = ['tg_sector', 'tg_manzana', 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
     const styles = {
-        'tg_sector': { color: "#475569", weight: 3, fill: false, opacity: 1, interactive: false },
+        'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: false },
         'tg_manzana': { color: "#2563eb", weight: 2, fill: false, opacity: 1, interactive: false },
         'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
@@ -152,7 +152,11 @@
                     }
                 }).addTo(map);
                 addLayerCheckbox(id);
-                if(id === 'tg_sector') populateSectors(data);
+                if(id === 'tg_sector') {
+                    populateSectors(data);
+                    // ENFOQUE INICIAL A LA CAPA SECTOR
+                    map.fitBounds(geoLayers[id].getBounds());
+                }
             } catch(e) { console.warn("Error cargando " + id); }
         }
         map.on('zoomend', refreshLabels);
@@ -183,7 +187,7 @@
 
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // SIN FONDO
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
                         if (isExactLote) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
@@ -193,7 +197,7 @@
                     }
                 } else {
                     if (isExactLote) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); // SIN FONDO
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds());
                         else zoomBounds.extend(l.getLatLng());
@@ -240,8 +244,10 @@
         let data = filter === 'ALL' ? currentResultsData : currentResultsData.filter(d => d.layer === filter);
         
         data.forEach((item) => {
-            // RESTAURADO: Lógica de la etiqueta de ORDEN para puertas y PISO para construcción
             let badge = '';
+            // Ajuste para mostrar "EDIFICA" en el encabezado de resultado si corresponde
+            let layerTitle = item.layer === 'TG_EDIFICA' ? 'TG_EDIFICA' : item.layer;
+
             if (item.layer === 'TG_PUERTA' && item.props.orden) {
                 badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
             } else if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) {
@@ -249,7 +255,7 @@
             }
 
             html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;">
-                        <span>CAPA: ${item.layer}</span>
+                        <span>CAPA: ${layerTitle}</span>
                         ${badge}
                      </div>`;
             html += `<table>`;
@@ -296,7 +302,7 @@
 
     function addLayerCheckbox(id) {
         const list = document.getElementById('layer-list');
-        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificaciones', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
+        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificas', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         const div = document.createElement('div');
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
@@ -349,7 +355,8 @@
         for (let id in geoLayers) {
             geoLayers[id].eachLayer(l => l.setStyle(styles[id]));
         }
-        map.setView([-12.046, -77.042], 18);
+        // AL RESETEAR, VOLVER A ENFOCAR EL SECTOR
+        if(geoLayers['tg_sector']) map.fitBounds(geoLayers['tg_sector'].getBounds());
     }
 
     function closeResults() {
