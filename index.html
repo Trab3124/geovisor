@@ -7,6 +7,7 @@
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-textpath@1.2.3/leaflet.textpath.min.js"></script>
 
     <style>
         body { margin:0; font-family: Arial, sans-serif; background: #f1f5f9; overflow: hidden; }
@@ -57,10 +58,6 @@
         .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200; white-space: nowrap; }
         .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1.5px 1.5px 0px #fff; }
         .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 0px #fff; }
-        
-        /* ESTILO ETIQUETA VÍA */
-        .label-via { font-size: 10px; font-weight: bold; color: #000; white-space: nowrap; }
-        
         .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
@@ -123,7 +120,7 @@
 
     const styles = {
         'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: true },
-        'tg_eje_via': { color: "#334155", weight: 1.5, opacity: 0.8, interactive: false },
+        'tg_eje_via': { color: "#334155", weight: 2, opacity: 0.8, interactive: false },
         'tg_manzana': { color: "#f97316", weight: 2, fill: false, opacity: 1, interactive: true },
         'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
@@ -156,7 +153,7 @@
     async function init() {
         await fetchExcelStatus();
 
-        // Cargar Eje Vía
+        // Cargar Ejes de Vía con Etiquetas Paralelas
         try {
             const resV = await fetch(`${BASE_PATH}/${viaLayerKey}.geojson`);
             const dataV = await resV.json();
@@ -164,7 +161,9 @@
                 style: styles[viaLayerKey],
                 onEachFeature: (f, l) => {
                     const txt = `${f.properties.cod_via || ''} ${f.properties.nom_via || ''}`.trim();
-                    if(txt) L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-via', html: `<b>${txt}</b>` }), interactive: false }).addTo(viaLabels);
+                    if(txt) {
+                        l.setText(txt, { repeat: true, offset: -8, attributes: { 'font-weight': 'bold', 'font-size': '13', 'fill': '#000' } });
+                    }
                 }
             }).addTo(map);
             addLayerCheckbox(viaLayerKey);
@@ -194,7 +193,6 @@
             map.fitBounds(geoLayers[sectorLayerKey].getBounds());
         } catch(e) {}
         map.on('zoomend', handleLabelsVisibility);
-        handleLabelsVisibility();
     }
 
     function handleLabelsVisibility() {
@@ -202,16 +200,9 @@
         if (zoom > 17) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
         else { if(document.getElementById('chk-tg_sector')?.checked) map.addLayer(sectorLabels); }
         
-        // Mostrar ejes y etiquetas de vía solo en escala de manzana (Zoom >= 18)
-        if (zoom >= 18) { 
-            if(document.getElementById(`chk-${viaLayerKey}`)?.checked) {
-                map.addLayer(viaLabels); 
-                map.addLayer(geoLayers[viaLayerKey]);
-            }
-        } else {
-            map.removeLayer(viaLabels);
-            if(geoLayers[viaLayerKey]) map.removeLayer(geoLayers[viaLayerKey]);
-        }
+        if (zoom < 17 && geoLayers[viaLayerKey]) { map.removeLayer(geoLayers[viaLayerKey]); }
+        else if (document.getElementById(`chk-${viaLayerKey}`)?.checked) { map.addLayer(geoLayers[viaLayerKey]); }
+        
         refreshLabels();
     }
 
@@ -260,17 +251,20 @@
                 const isMznMatch = (p.cod_sector == sec && p.cod_mzna == mzn);
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0.2 }); 
-                        // Forzamos interactividad para permitir el clic incluso si no hay lote seleccionado en el dropdown
-                        l.getElement()?.style.setProperty('pointer-events', 'auto');
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        // REHABILITAR INTERACTIVIDAD PARA CLIC MANUAL EN LOTE TRAS FILTRO DE MANZANA
+                        if(l.getElement()) l.getElement().style.pointerEvents = 'auto';
                         if (isExactLote || !lot) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
                         }
-                    } else l.setStyle({ opacity: 0, fillOpacity: 0 });
+                    } else {
+                        l.setStyle({ opacity: 0, fillOpacity: 0 });
+                        if(l.getElement()) l.getElement().style.pointerEvents = 'none';
+                    }
                 } else if (id !== sectorLayerKey) {
                     if (isExactLote) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0.4 }); 
+                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds()); else zoomBounds.extend(l.getLatLng());
                     } else l.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -343,15 +337,8 @@
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
-            if(e.target.checked) { 
-                if(id === sectorLayerKey || id === viaLayerKey) handleLabelsVisibility(); 
-                else map.addLayer(geoLayers[id]); 
-            }
-            else { 
-                if(id === sectorLayerKey) map.removeLayer(sectorLabels); 
-                else if(id === viaLayerKey) { map.removeLayer(viaLabels); map.removeLayer(geoLayers[viaLayerKey]); }
-                else map.removeLayer(geoLayers[id]); 
-            }
+            if(e.target.checked) { if(id === sectorLayerKey) handleLabelsVisibility(); else map.addLayer(geoLayers[id]); }
+            else { if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); }
             refreshLabels();
         };
         list.appendChild(div);
