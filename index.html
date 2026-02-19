@@ -26,7 +26,6 @@
         #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; max-height: 450px; }
         .scroll-area { overflow-y: auto; flex-grow: 1; margin-top: 10px; }
 
-        /* --- ESTILOS PARA EL ESTADO --- */
         #status-container {
             display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 10px 0;
             border-radius: 6px; font-size: 11px; font-weight: bold; border: 1px solid transparent;
@@ -36,7 +35,6 @@
         .st-precampo { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
         .st-omision { background: #ffedd5; color: #9a3412; border-color: #fed7aa; }
         
-        /* ESTILO PARA RESALTAR COD_EDIFIC */
         .edifica-highlight { font-weight: bold; padding: 2px 6px; border-radius: 4px; color: white; font-size: 10px; }
 
         #search-panel { position: absolute; right: 10px; top: 50px; width: 280px; z-index: 1000; }
@@ -56,9 +54,11 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
+        /* ETIQUETAS */
         .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200; white-space: nowrap; }
         .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1.5px 1.5px 0px #fff; }
         .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 0px #fff; }
+        .label-via { font-size: 9px; font-weight: bold; color: #334155; text-transform: uppercase; background: rgba(255,255,255,0.7); padding: 1px 3px; border-radius: 3px; border: 0.5px solid #ccc; }
         .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
@@ -116,10 +116,12 @@
 
     const BASE_PATH = './data';
     const sectorLayerKey = 'tg_sector';
+    const viaLayerKey = 'tg_eje_via';
     const CSV_URL = 'https://raw.githubusercontent.com/Trab3124/geovisor/refs/heads/main/estados_manzana.csv';
 
     const styles = {
         'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: true },
+        'tg_eje_via': { color: "#64748b", weight: 2, dashArray: '5, 5', opacity: 0.8, interactive: false },
         'tg_manzana': { color: "#f97316", weight: 2, fill: false, opacity: 1, interactive: true },
         'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
@@ -133,6 +135,7 @@
     let highlightLayer = L.layerGroup().addTo(map);
     let labelLayer = L.layerGroup().addTo(map);
     let sectorLabels = L.layerGroup().addTo(map);
+    let viaLabels = L.layerGroup().addTo(map);
 
     const sSec = document.getElementById('sel-sector'), sMzn = document.getElementById('sel-mzna'), sLot = document.getElementById('sel-lote');
 
@@ -150,6 +153,25 @@
 
     async function init() {
         await fetchExcelStatus();
+        
+        // Cargar Capa Eje Vía (General)
+        try {
+            const resVia = await fetch(`${BASE_PATH}/${viaLayerKey}.geojson`);
+            const dataVia = await resVia.json();
+            geoLayers[viaLayerKey] = L.geoJSON(dataVia, { 
+                style: styles[viaLayerKey],
+                onEachFeature: (f, l) => {
+                    const labelText = `${f.properties.cod_via || ''} - ${f.properties.nom_via || ''}`;
+                    L.marker(l.getBounds().getCenter(), { 
+                        icon: L.divIcon({ className: 'label-via', html: labelText }), 
+                        interactive: false 
+                    }).addTo(viaLabels);
+                }
+            }).addTo(map);
+            addLayerCheckbox(viaLayerKey);
+        } catch(e) { console.log("No se encontró tg_eje_via"); }
+
+        // Cargar Capa Sector
         try {
             const res = await fetch(`${BASE_PATH}/${sectorLayerKey}.geojson`);
             const data = await res.json();
@@ -161,6 +183,7 @@
             }).addTo(map);
             addLayerCheckbox(sectorLayerKey);
             const sectoresList = populateSectors(data);
+            
             geoLayers['tg_manzana'] = L.featureGroup().addTo(map);
             addLayerCheckbox('tg_manzana');
             for (let sId of sectoresList) {
@@ -174,12 +197,27 @@
             map.fitBounds(geoLayers[sectorLayerKey].getBounds());
         } catch(e) {}
         map.on('zoomend', handleLabelsVisibility);
+        handleLabelsVisibility(); // Ejecutar al inicio
     }
 
     function handleLabelsVisibility() {
         const zoom = map.getZoom();
+        
+        // Control Sectores
         if (zoom > 17) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
         else { if(document.getElementById('chk-tg_sector')?.checked) map.addLayer(sectorLabels); }
+        
+        // Control Vías (Solo visible a partir de zoom 18)
+        if (zoom >= 18) { 
+            if(document.getElementById(`chk-${viaLayerKey}`)?.checked) {
+                map.addLayer(viaLabels); 
+                if(!map.hasLayer(geoLayers[viaLayerKey])) map.addLayer(geoLayers[viaLayerKey]);
+            }
+        } else { 
+            map.removeLayer(viaLabels); 
+            if(map.hasLayer(geoLayers[viaLayerKey])) map.removeLayer(geoLayers[viaLayerKey]);
+        }
+
         refreshLabels();
     }
 
@@ -195,7 +233,12 @@
                 geoLayers[key] = L.geoJSON(data, {
                     style: styles[key],
                     pointToLayer: (f, latlng) => key === 'tg_puerta' ? L.circleMarker(latlng, styles[key]) : null,
-                    onEachFeature: (f, l) => { if (key === 'tg_lote') l.on('click', (e) => { L.DomEvent.stopPropagation(e); autoFilterByLote(f.properties); }); }
+                    onEachFeature: (f, l) => { 
+                        if (key === 'tg_lote') l.on('click', (e) => { 
+                            L.DomEvent.stopPropagation(e); 
+                            autoFilterByLote(f.properties); 
+                        }); 
+                    }
                 }).addTo(map);
                 if (!document.getElementById(`chk-${key}`)) addLayerCheckbox(key);
             } catch(e) {}
@@ -220,23 +263,26 @@
         currentResultsData = [];
         let zoomBounds = L.latLngBounds();
         const allKeys = [sectorLayerKey, 'tg_lote', 'tg_edifica', 'tg_construccion', 'tg_puerta'];
+        
         allKeys.forEach(id => {
             if (!geoLayers[id]) return;
             geoLayers[id].eachLayer(l => {
                 const p = l.feature.properties;
                 const isExactLote = (p.cod_sector == sec && p.cod_mzna == mzn && p.cod_lote == lot);
                 const isMznMatch = (p.cod_sector == sec && p.cod_mzna == mzn);
+                
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        // Cambiamos a interactivo: true para que se pueda clickear aun con filtro de manzana
+                        l.setStyle({ opacity: 1, fillOpacity: 0.1, interactive: true }); 
                         if (isExactLote || !lot) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
                         }
-                    } else l.setStyle({ opacity: 0, fillOpacity: 0 });
+                    } else l.setStyle({ opacity: 0, fillOpacity: 0, interactive: false });
                 } else if (id !== sectorLayerKey) {
                     if (isExactLote) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        l.setStyle({ opacity: 1, fillOpacity: 0.1 }); 
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds()); else zoomBounds.extend(l.getLatLng());
                     } else l.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -304,13 +350,21 @@
     function addLayerCheckbox(id) {
         if(document.getElementById(`chk-${id}`)) return;
         const list = document.getElementById('layer-list');
-        const labels = {tg_sector:'Sectores', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificas', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
+        const labels = {tg_sector:'Sectores', tg_eje_via:'Ejes de Vía', tg_manzana:'Manzanas', tg_lote:'Lotes', tg_edifica:'Edificas', tg_construccion:'Construcciones', tg_puerta:'Puertas'};
         const div = document.createElement('div');
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id]}</label>`;
         div.querySelector('input').onchange = (e) => {
-            if(e.target.checked) { if(id === sectorLayerKey) handleLabelsVisibility(); else map.addLayer(geoLayers[id]); }
-            else { if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); }
+            if(e.target.checked) { 
+                if(id === sectorLayerKey) handleLabelsVisibility(); 
+                else if(id === viaLayerKey) handleLabelsVisibility();
+                else map.addLayer(geoLayers[id]); 
+            }
+            else { 
+                if(id === sectorLayerKey) map.removeLayer(sectorLabels); 
+                else if(id === viaLayerKey) { map.removeLayer(viaLabels); map.removeLayer(geoLayers[viaLayerKey]); }
+                else map.removeLayer(geoLayers[id]); 
+            }
             refreshLabels();
         };
         list.appendChild(div);
@@ -327,7 +381,6 @@
         });
     }
 
-    // --- FUNCIÓN MODIFICADA: ORDENAMIENTO Y COLORES POR EDIFICA ---
     function updateResultsUI() {
         const filter = document.getElementById('filter-layer-results').value;
         const content = document.getElementById('results-content');
@@ -345,22 +398,15 @@
             statusBox.innerHTML = `<div id="status-container" class="${config.cls}"><div class="status-dot" style="background:${config.dot}"></div>ESTADO MZ: ${dataEstado.estado.toUpperCase()}</div>`;
         }
 
-        // LÓGICA DE FILTRADO Y ORDENAMIENTO POR EDIFICA
         let data = filter === 'ALL' ? [...currentResultsData] : currentResultsData.filter(d => d.layer === filter);
-
         const edificaColors = ["#2563eb", "#7c3aed", "#db2777", "#059669", "#d97706", "#475569"];
 
         data.sort((a, b) => {
-            // Prioridad 1: Por Capa (Lote, Edifica, Construccion, Puerta)
             const layerOrder = { 'TG_LOTE': 1, 'TG_EDIFICA': 2, 'TG_CONSTRUCCION': 3, 'TG_PUERTA': 4 };
             if (layerOrder[a.layer] !== layerOrder[b.layer]) return layerOrder[a.layer] - layerOrder[b.layer];
-            
-            // Prioridad 2: Por cod_edific
             const edifA = parseInt(a.props.cod_edific) || 0;
             const edifB = parseInt(b.props.cod_edific) || 0;
             if (edifA !== edifB) return edifA - edifB;
-
-            // Prioridad 3: Por piso o orden
             const valA = parseInt(a.props.piso || a.props.orden) || 0;
             const valB = parseInt(b.props.piso || b.props.orden) || 0;
             return valA - valB;
@@ -376,14 +422,11 @@
             html += `<table>`;
             for (let key in item.props) {
                 let val = item.props[key];
-                
-                // Pintar la fila cod_edific
                 if (key.toLowerCase() === 'cod_edific' && val) {
                     const idx = parseInt(val) % edificaColors.length;
                     const color = edificaColors[idx];
                     val = `<span class="edifica-highlight" style="background:${color}">${val}</span>`;
                 }
-
                 if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
                 html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
             }
