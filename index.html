@@ -54,16 +54,21 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200; white-space: nowrap; }
+        .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200; white-space: nowrap; }
         .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1.5px 1.5px 0px #fff; }
         .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 0px #fff; }
 
-        /* ESTILO MEJORADO PARA ETIQUETAS DE VÍAS */
+        /* ESTILO PARA ETIQUETAS DE VÍAS */
         .label-vias { 
-            font-size: 11px; font-weight: bold; color: #1e293b; 
+            font-size: 11px; 
+            font-weight: bold; 
+            color: #1e293b; 
             text-shadow: 1.5px 1.5px 0 #fff, -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff; 
-            pointer-events: none; white-space: nowrap; z-index: 2000 !important;
+            pointer-events: none; 
+            white-space: nowrap !important;
+            z-index: 2000 !important;
         }
+
         .leaflet-interactive { cursor: pointer; }
     </style>
 </head>
@@ -161,15 +166,14 @@
             const res = await fetch(`${BASE_PATH}/${viaLayerKey}.geojson`);
             const data = await res.json();
             
-            // Crear la capa de geometrías
             geoLayers[viaLayerKey] = L.geoJSON(data, { style: styles[viaLayerKey] });
             addLayerCheckbox(viaLayerKey);
 
             const uniqueVias = {};
             data.features.forEach(f => {
-                const props = f.properties;
-                const name = props.nom_via || props.NOM_VIA;
-                const code = props.cod_via || props.COD_VIA || '00';
+                const p = f.properties;
+                const name = p.nom_via;
+                const code = p.cod_via || '00';
                 if (!name || name.trim() === "") return;
 
                 if (!uniqueVias[name]) {
@@ -181,15 +185,13 @@
             viaLabelsGroup.clearLayers();
             for (let name in uniqueVias) {
                 const via = uniqueVias[name];
-                // Tomamos el segmento más representativo (el del medio de la lista)
-                const seg = via.segments[Math.floor(via.segments.length / 2)];
+                const seg = via.segments.reduce((a, b) => a.length > b.length ? a : b);
                 if (!seg || seg.length < 2) continue;
 
                 const midIdx = Math.floor(seg.length / 2);
                 const p1 = seg[midIdx];
                 const p2 = seg[midIdx + 1] || seg[midIdx - 1];
 
-                // Cálculo de ángulo para rotación paralela
                 const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * (180 / Math.PI);
                 const finalAngle = (angle > 90) ? angle - 180 : (angle < -90) ? angle + 180 : angle;
 
@@ -203,7 +205,6 @@
                     interactive: false
                 }).addTo(viaLabelsGroup);
             }
-            handleLabelsVisibility();
         } catch(e) { console.error("Error cargando vías:", e); }
     }
 
@@ -234,24 +235,26 @@
             map.fitBounds(geoLayers[sectorLayerKey].getBounds());
         } catch(e) {}
         map.on('zoomend', handleLabelsVisibility);
+        handleLabelsVisibility();
     }
 
     function handleLabelsVisibility() {
         const zoom = map.getZoom();
+        const chkSector = document.getElementById('chk-tg_sector')?.checked;
         const chkVia = document.getElementById(`chk-${viaLayerKey}`)?.checked;
-        
-        // --- CONTROL DE ESCALA PARA VÍAS (ZOOM >= 17) ---
-        if (zoom >= 17 && chkVia) {
-            if (geoLayers[viaLayerKey] && !map.hasLayer(geoLayers[viaLayerKey])) map.addLayer(geoLayers[viaLayerKey]);
-            if (!map.hasLayer(viaLabelsGroup)) map.addLayer(viaLabelsGroup);
-        } else {
-            if (geoLayers[viaLayerKey] && map.hasLayer(geoLayers[viaLayerKey])) map.removeLayer(geoLayers[viaLayerKey]);
-            if (map.hasLayer(viaLabelsGroup)) map.removeLayer(viaLabelsGroup);
-        }
 
-        // Control de Sectores
-        if (zoom > 17) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
-        else { if(document.getElementById('chk-tg_sector')?.checked) map.addLayer(sectorLabels); }
+        // Visibilidad de Sectores
+        if (zoom > 17 || !chkSector) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
+        else { map.addLayer(sectorLabels); }
+
+        // Visibilidad de Vías y sus Etiquetas
+        if (zoom >= 17 && chkVia) {
+            if (geoLayers[viaLayerKey]) map.addLayer(geoLayers[viaLayerKey]);
+            map.addLayer(viaLabelsGroup);
+        } else {
+            if (geoLayers[viaLayerKey]) map.removeLayer(geoLayers[viaLayerKey]);
+            map.removeLayer(viaLabelsGroup);
+        }
         
         refreshLabels();
     }
@@ -381,7 +384,16 @@
         const div = document.createElement('div');
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id] || id}</label>`;
-        div.querySelector('input').onchange = () => handleLabelsVisibility();
+        div.querySelector('input').onchange = (e) => {
+            if(id === viaLayerKey) {
+                handleLabelsVisibility();
+            } else if(e.target.checked) { 
+                if(id === sectorLayerKey) handleLabelsVisibility(); else map.addLayer(geoLayers[id]); 
+            } else { 
+                if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); 
+            }
+            refreshLabels();
+        };
         list.appendChild(div);
     }
 
@@ -401,7 +413,9 @@
         const content = document.getElementById('results-content');
         const statusBox = document.getElementById('status-box');
         const panel = document.getElementById('results-panel');
-        const sec = sSec.value, mzn = sMzn.value;
+
+        const sec = sSec.value;
+        const mzn = sMzn.value;
         const dataEstado = excelData.find(d => d.sector == sec && d.mzna == mzn);
         statusBox.innerHTML = ""; 
         if (dataEstado) {
@@ -410,27 +424,35 @@
             if (dataEstado.estado === 'PreCampo') config = { cls: 'st-precampo', dot: '#dc2626' };
             statusBox.innerHTML = `<div id="status-container" class="${config.cls}"><div class="status-dot" style="background:${config.dot}"></div>ESTADO MZ: ${dataEstado.estado.toUpperCase()}</div>`;
         }
+
         let data = filter === 'ALL' ? [...currentResultsData] : currentResultsData.filter(d => d.layer === filter);
         const edificaColors = ["#2563eb", "#7c3aed", "#db2777", "#059669", "#d97706", "#475569"];
+
         data.sort((a, b) => {
             const layerOrder = { 'TG_LOTE': 1, 'TG_EDIFICA': 2, 'TG_CONSTRUCCION': 3, 'TG_PUERTA': 4 };
             if (layerOrder[a.layer] !== layerOrder[b.layer]) return layerOrder[a.layer] - layerOrder[b.layer];
             const edifA = parseInt(a.props.cod_edific) || 0;
             const edifB = parseInt(b.props.cod_edific) || 0;
             if (edifA !== edifB) return edifA - edifB;
-            return (parseInt(a.props.piso || a.props.orden) || 0) - (parseInt(b.props.piso || b.props.orden) || 0);
+            const valA = parseInt(a.props.piso || a.props.orden) || 0;
+            const valB = parseInt(b.props.piso || b.props.orden) || 0;
+            return valA - valB;
         });
+
         let html = "";
         data.forEach((item) => {
             let badge = '';
             if (item.layer === 'TG_PUERTA' && item.props.orden) badge = `<span class="order-badge">Orden ${item.props.orden}</span>`;
             else if (item.layer === 'TG_CONSTRUCCION' && item.props.piso) badge = `<span class="order-badge" style="background:#dc2626">Piso ${item.props.piso}</span>`;
+            
             html += `<div style="background:#f1f5f9; padding:5px; font-weight:bold; font-size:10px; border-left:4px solid #1e40af; display:flex; justify-content:space-between; align-items:center;"><span>CAPA: ${item.layer}</span>${badge}</div>`;
             html += `<table>`;
             for (let key in item.props) {
                 let val = item.props[key];
                 if (key.toLowerCase() === 'cod_edific' && val) {
-                    val = `<span class="edifica-highlight" style="background:${edificaColors[parseInt(val)%edificaColors.length]}">${val}</span>`;
+                    const idx = parseInt(val) % edificaColors.length;
+                    const color = edificaColors[idx];
+                    val = `<span class="edifica-highlight" style="background:${color}">${val}</span>`;
                 }
                 if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
                 html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
