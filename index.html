@@ -26,6 +26,7 @@
         #results-panel { display: none; flex-direction: column; overflow: hidden; border-top: 5px solid #1e40af; max-height: 450px; }
         .scroll-area { overflow-y: auto; flex-grow: 1; margin-top: 10px; }
 
+        /* ESTADOS */
         #status-container {
             display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin: 10px 0;
             border-radius: 6px; font-size: 11px; font-weight: bold; border: 1px solid transparent;
@@ -54,19 +55,15 @@
         .layer-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 5px; }
         .close-btn { color: #ef4444; cursor: pointer; font-size: 18px; font-weight: bold; }
         
-        .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200; white-space: nowrap; }
+        /* ETIQUETAS */
+        .label-sector { font-size: 18px; font-weight: bold; color: #1e40af; text-shadow: 2px 2px 0 #fff200, -2px -2px 0 #fff200, 2px -2px 0 #fff200, -2px 2px 0 #fff200; white-space: nowrap; }
         .label-mzna { font-size: 12px; font-weight: bold; color: #2563eb; text-shadow: 1.5px 1.5px 0px #fff; }
         .label-lote { font-size: 10px; color: #16a34a; text-shadow: 1px 1px 0px #fff; }
-
-        /* ESTILO PARA ETIQUETAS DE VÍAS */
+        
         .label-vias { 
-            font-size: 11px; 
-            font-weight: bold; 
-            color: #1e293b; 
-            text-shadow: 1.5px 1.5px 0 #fff, -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff; 
-            pointer-events: none; 
-            white-space: nowrap !important;
-            z-index: 2000 !important;
+            font-size: 10px; font-weight: bold; color: #334155; 
+            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; 
+            white-space: nowrap !important; pointer-events: none;
         }
 
         .leaflet-interactive { cursor: pointer; }
@@ -131,9 +128,9 @@
 
     const styles = {
         'tg_sector': { color: "#1e40af", weight: 3, fill: false, opacity: 1, interactive: true },
-        'tg_eje_via': { color: "#475569", weight: 3, opacity: 0.6, interactive: false },
         'tg_manzana': { color: "#f97316", weight: 2, fill: false, opacity: 1, interactive: true },
         'tg_lote': { color: "#16a34a", weight: 1.5, fillOpacity: 0.2, opacity: 1, interactive: true },
+        'tg_eje_via': { color: "#64748b", weight: 2.5, opacity: 0.8, dashArray: '5, 5', interactive: false },
         'tg_edifica': { color: "#d97706", weight: 1, fillOpacity: 0.4, opacity: 1, interactive: false },
         'tg_construccion': { color: "#dc2626", weight: 0.8, fillOpacity: 0.3, opacity: 1, interactive: false },
         'tg_puerta': { radius: 2.5, fillColor: "#000", color: "#fff", weight: 0.5, fillOpacity: 1, opacity: 1, interactive: false }
@@ -165,47 +162,27 @@
         try {
             const res = await fetch(`${BASE_PATH}/${viaLayerKey}.geojson`);
             const data = await res.json();
-            
             geoLayers[viaLayerKey] = L.geoJSON(data, { style: styles[viaLayerKey] });
-            addLayerCheckbox(viaLayerKey);
-
-            const uniqueVias = {};
+            
+            viaLabelsGroup.clearLayers();
             data.features.forEach(f => {
                 const p = f.properties;
-                const name = p.nom_via;
-                const code = p.cod_via || '00';
-                if (!name || name.trim() === "") return;
-
-                if (!uniqueVias[name]) {
-                    uniqueVias[name] = { fullName: `(${code}) ${name}`, segments: [] };
-                }
-                if (f.geometry.type === "LineString") uniqueVias[name].segments.push(f.geometry.coordinates);
-            });
-
-            viaLabelsGroup.clearLayers();
-            for (let name in uniqueVias) {
-                const via = uniqueVias[name];
-                const seg = via.segments.reduce((a, b) => a.length > b.length ? a : b);
-                if (!seg || seg.length < 2) continue;
-
-                const midIdx = Math.floor(seg.length / 2);
-                const p1 = seg[midIdx];
-                const p2 = seg[midIdx + 1] || seg[midIdx - 1];
-
-                const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * (180 / Math.PI);
-                const finalAngle = (angle > 90) ? angle - 180 : (angle < -90) ? angle + 180 : angle;
-
-                L.marker([p1[1], p1[0]], {
-                    icon: L.divIcon({ 
-                        className: 'label-vias', 
-                        html: `<div style="transform: rotate(${-finalAngle}deg); width:max-content; min-width:200px; text-align:center;">${via.fullName}</div>`,
-                        iconSize: [0, 0],
-                        iconAnchor: [100, 7]
+                if (!p.nom_via) return;
+                const coords = f.geometry.coordinates;
+                const mid = Math.floor(coords.length / 2);
+                const pos = [coords[mid][1], coords[mid][0]];
+                
+                L.marker(pos, {
+                    icon: L.divIcon({
+                        className: 'label-vias',
+                        html: `(${p.cod_via || '00'}) ${p.nom_via}`,
+                        iconSize: [0,0]
                     }),
                     interactive: false
                 }).addTo(viaLabelsGroup);
-            }
-        } catch(e) { console.error("Error cargando vías:", e); }
+            });
+            addLayerCheckbox(viaLayerKey);
+        } catch(e) { console.log("No se pudo cargar vías"); }
     }
 
     async function init() {
@@ -224,6 +201,7 @@
             const sectoresList = populateSectors(data);
             geoLayers['tg_manzana'] = L.featureGroup().addTo(map);
             addLayerCheckbox('tg_manzana');
+            
             for (let sId of sectoresList) {
                 const folder = `${BASE_PATH}/sector_${sId.padStart(2, '0')}`;
                 fetch(`${folder}/tg_manzana.geojson`).then(r => r.json()).then(mznData => {
@@ -240,22 +218,18 @@
 
     function handleLabelsVisibility() {
         const zoom = map.getZoom();
-        const chkSector = document.getElementById('chk-tg_sector')?.checked;
-        const chkVia = document.getElementById(`chk-${viaLayerKey}`)?.checked;
-
-        // Visibilidad de Sectores
-        if (zoom > 17 || !chkSector) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
-        else { map.addLayer(sectorLabels); }
-
-        // Visibilidad de Vías y sus Etiquetas
-        if (zoom >= 17 && chkVia) {
-            if (geoLayers[viaLayerKey]) map.addLayer(geoLayers[viaLayerKey]);
+        // Sectores
+        if (zoom > 17) { if(map.hasLayer(sectorLabels)) map.removeLayer(sectorLabels); } 
+        else { if(document.getElementById('chk-tg_sector')?.checked) map.addLayer(sectorLabels); }
+        
+        // Vías
+        if (zoom >= 17 && document.getElementById(`chk-${viaLayerKey}`)?.checked) {
+            if(geoLayers[viaLayerKey]) map.addLayer(geoLayers[viaLayerKey]);
             map.addLayer(viaLabelsGroup);
         } else {
-            if (geoLayers[viaLayerKey]) map.removeLayer(geoLayers[viaLayerKey]);
+            if(geoLayers[viaLayerKey]) map.removeLayer(geoLayers[viaLayerKey]);
             map.removeLayer(viaLabelsGroup);
         }
-        
         refreshLabels();
     }
 
@@ -304,7 +278,7 @@
                 const isMznMatch = (p.cod_sector == sec && p.cod_mzna == mzn);
                 if (id === 'tg_lote') {
                     if (isMznMatch) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        l.setStyle({ opacity: 1, fillOpacity: 0.1 }); 
                         if (isExactLote || !lot) {
                             currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                             zoomBounds.extend(l.getBounds());
@@ -312,7 +286,7 @@
                     } else l.setStyle({ opacity: 0, fillOpacity: 0 });
                 } else if (id !== sectorLayerKey) {
                     if (isExactLote) {
-                        l.setStyle({ opacity: 1, fillOpacity: 0 }); 
+                        l.setStyle({ opacity: 1, fillOpacity: 0.3 }); 
                         currentResultsData.push({ layer: id.toUpperCase(), props: p, obj: l });
                         if (l.getBounds) zoomBounds.extend(l.getBounds()); else zoomBounds.extend(l.getLatLng());
                     } else l.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -331,11 +305,19 @@
         labelLayer.clearLayers();
         const zoom = map.getZoom();
         if (zoom < 16 || !sMzn.value) return;
-        geoLayers['tg_manzana'].eachLayer(group => {
-            group.eachLayer(l => { if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }), interactive: false }).addTo(labelLayer); });
-        });
+        if(geoLayers['tg_manzana']){
+            geoLayers['tg_manzana'].eachLayer(group => {
+                group.eachLayer(l => { 
+                    if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) 
+                        L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-mzna', html: `MZ ${l.feature.properties.cod_mzna}` }), interactive: false }).addTo(labelLayer); 
+                });
+            });
+        }
         if (zoom >= 19 && geoLayers['tg_lote']) {
-            geoLayers['tg_lote'].eachLayer(l => { if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-lote', html: l.feature.properties.cod_lote }), interactive: false }).addTo(labelLayer); });
+            geoLayers['tg_lote'].eachLayer(l => { 
+                if (l.feature.properties.cod_mzna === sMzn.value && l.feature.properties.cod_sector === sSec.value) 
+                    L.marker(l.getBounds().getCenter(), { icon: L.divIcon({ className: 'label-lote', html: l.feature.properties.cod_lote }), interactive: false }).addTo(labelLayer); 
+            });
         }
     }
 
@@ -385,21 +367,18 @@
         div.className = 'layer-row';
         div.innerHTML = `<input type="checkbox" checked id="chk-${id}"> <label for="chk-${id}">${labels[id] || id}</label>`;
         div.querySelector('input').onchange = (e) => {
-            if(id === viaLayerKey) {
-                handleLabelsVisibility();
-            } else if(e.target.checked) { 
-                if(id === sectorLayerKey) handleLabelsVisibility(); else map.addLayer(geoLayers[id]); 
-            } else { 
-                if(id === sectorLayerKey) map.removeLayer(sectorLabels); else map.removeLayer(geoLayers[id]); 
+            handleLabelsVisibility();
+            if(id !== viaLayerKey && id !== sectorLayerKey) {
+                if(e.target.checked) map.addLayer(geoLayers[id]); else map.removeLayer(geoLayers[id]);
             }
-            refreshLabels();
         };
         list.appendChild(div);
     }
 
     function zoomToFid(layerId, fidValue) {
-        if(!geoLayers[layerId]) return;
-        geoLayers[layerId].eachLayer(l => {
+        const id = layerId.toLowerCase();
+        if(!geoLayers[id]) return;
+        geoLayers[id].eachLayer(l => {
             if (l.feature.properties.fid == fidValue) {
                 if (l.getBounds) map.fitBounds(l.getBounds(), { maxZoom: 22 });
                 else map.setView(l.getLatLng(), 22);
@@ -434,9 +413,7 @@
             const edifA = parseInt(a.props.cod_edific) || 0;
             const edifB = parseInt(b.props.cod_edific) || 0;
             if (edifA !== edifB) return edifA - edifB;
-            const valA = parseInt(a.props.piso || a.props.orden) || 0;
-            const valB = parseInt(b.props.piso || b.props.orden) || 0;
-            return valA - valB;
+            return (parseInt(a.props.piso || a.props.orden) || 0) - (parseInt(b.props.piso || b.props.orden) || 0);
         });
 
         let html = "";
@@ -450,11 +427,10 @@
             for (let key in item.props) {
                 let val = item.props[key];
                 if (key.toLowerCase() === 'cod_edific' && val) {
-                    const idx = parseInt(val) % edificaColors.length;
-                    const color = edificaColors[idx];
+                    const color = edificaColors[parseInt(val) % edificaColors.length];
                     val = `<span class="edifica-highlight" style="background:${color}">${val}</span>`;
                 }
-                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer.toLowerCase()}', '${val}')">${val}</span>`;
+                if (key.toLowerCase() === 'fid') val = `<span class="fid-link" onclick="zoomToFid('${item.layer}', '${val}')">${val}</span>`;
                 html += `<tr><td class="attr-key">${key}</td><td>${val || '-'}</td></tr>`;
             }
             html += `</table>`;
